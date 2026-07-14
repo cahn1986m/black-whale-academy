@@ -15,7 +15,7 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/groups')
+    fetch('/api/groups', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => setGroups(data.groups || []));
   }, []);
@@ -30,7 +30,7 @@ export default function HistoryPage() {
     try {
       const params = new URLSearchParams({ date });
       if (groupId) params.set('groupId', groupId);
-      const res = await fetch(`/api/attendance?${params.toString()}`);
+      const res = await fetch(`/api/attendance?${params.toString()}`, { cache: 'no-store' });
       const data = await res.json();
       setRecords(data.records || []);
     } finally {

@@ -30,7 +30,9 @@ export async function GET(request) {
           ORDER BY c.full_name ASC
         `;
 
-    return NextResponse.json({ date, records: rows });
+    return NextResponse.json({ date, records: rows }, {
+      headers: { 'Cache-Control': 'no-store, max-age=0' },
+    });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

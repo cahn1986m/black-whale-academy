@@ -12,7 +12,10 @@ export default function AdminPage() {
   const [error, setError] = useState('');
 
   const load = async () => {
-    const [gRes, cRes] = await Promise.all([fetch('/api/groups'), fetch('/api/children')]);
+    const [gRes, cRes] = await Promise.all([
+      fetch('/api/groups', { cache: 'no-store' }),
+      fetch('/api/children', { cache: 'no-store' }),
+    ]);
     const gData = await gRes.json();
     const cData = await cRes.json();
     setGroups(gData.groups || []);

@@ -16,7 +16,7 @@ export default function AttendancePage() {
   const lastScanRef = useRef({ code: null, time: 0 });
 
   useEffect(() => {
-    fetch('/api/groups')
+    fetch('/api/groups', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         setGroups(data.groups || []);
@@ -45,7 +45,7 @@ export default function AttendancePage() {
   const loadRecords = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/attendance?groupId=${groupId}`);
+      const res = await fetch(`/api/attendance?groupId=${groupId}`, { cache: 'no-store' });
       const data = await res.json();
       setRecords(data.records || []);
     } finally {

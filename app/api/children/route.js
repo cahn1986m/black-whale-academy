@@ -21,7 +21,9 @@ export async function GET(request) {
           ORDER BY full_name ASC
         `;
 
-    return NextResponse.json({ children });
+    return NextResponse.json({ children }, {
+      headers: { 'Cache-Control': 'no-store, max-age=0' },
+    });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

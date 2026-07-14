@@ -13,7 +13,9 @@ export async function GET() {
       GROUP BY g.id
       ORDER BY g.created_at ASC
     `;
-    return NextResponse.json({ groups });
+    return NextResponse.json({ groups }, {
+      headers: { 'Cache-Control': 'no-store, max-age=0' },
+    });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
