@@ -21,6 +21,8 @@ export default function AdminPage() {
 
   useEffect(() => {
     load();
+    const interval = setInterval(load, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   const addGroup = async (e) => {
@@ -97,6 +99,10 @@ export default function AdminPage() {
           </div>
         </div>
       ))}
+
+      <button className="btn secondary" type="button" onClick={load} style={{ marginTop: 8 }}>
+        🔄 تحديث القوائم
+      </button>
 
       <div style={{ fontWeight: 'bold', margin: '22px 0 10px' }}>
         الأطفال المسجلين ({children.length})

@@ -34,6 +34,8 @@ export default function AttendancePage() {
       try {
         window.localStorage?.setItem?.('bwa_group_id', groupId);
       } catch {}
+      const interval = setInterval(loadRecords, 15000);
+      return () => clearInterval(interval);
     } else {
       setRecords([]);
     }
