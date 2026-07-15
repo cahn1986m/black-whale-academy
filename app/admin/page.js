@@ -15,7 +15,7 @@ export default function AdminPage() {
   const load = async () => {
     const [gRes, cRes] = await Promise.all([
       fetch('/api/groups', { cache: 'no-store' }),
-      fetch('/api/children', { cache: 'no-store' }),
+      fetch('/api/child-list', { cache: 'no-store' }),
     ]);
     const gData = await gRes.json();
     const cData = await cRes.json();
