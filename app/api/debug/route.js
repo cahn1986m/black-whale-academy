@@ -5,23 +5,42 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const dbUrl = process.env.DATABASE_URL || '';
-    const hostMatch = dbUrl.match(/@([^/]+)\//);
-    const dbNameMatch = dbUrl.match(/\/([^?]+)(\?|$)/);
+    // نفس استعلام /api/children بالضبط
+    const sameAsChildren = await sql`
+      SELECT id, full_name, parent_contact, group_id, photo_base64, qr_token
+      FROM children
+      ORDER BY full_name ASC
+    `;
 
-    const countRows = await sql`SELECT COUNT(*)::int AS count FROM children`;
-    const allRows = await sql`SELECT id, full_name, created_at FROM children ORDER BY id`;
+    // استعلام بسيط بدون photo_base64 وبدون ORDER BY على full_name
+    const simple = await sql`
+      SELECT id, full_name FROM children ORDER BY id
+    `;
+
+    // نفس استعلام children بس بدون photo_base64
+    const noPhoto = await sql`
+      SELECT id, full_name, parent_contact, group_id, qr_token
+      FROM children
+      ORDER BY full_name ASC
+    `;
+
+    // نفس استعلام children مع photo_base64 بس ORDER BY id
+    const withPhotoOrderById = await sql`
+      SELECT id, full_name, photo_base64
+      FROM children
+      ORDER BY id ASC
+    `;
 
     return NextResponse.json({
-      host: hostMatch ? hostMatch[1] : 'unknown',
-      database: dbNameMatch ? dbNameMatch[1] : 'unknown',
-      countFromQuery: countRows[0].count,
-      rowsReturned: allRows.length,
-      rows: allRows,
-      gitCommit: process.env.VERCEL_GIT_COMMIT_SHA || 'unknown',
-      deploymentId: process.env.VERCEL_DEPLOYMENT_ID || 'unknown',
-      env: process.env.VERCEL_ENV || 'unknown',
-      region: process.env.VERCEL_REGION || 'unknown',
+      sameAsChildren_count: sameAsChildren.length,
+      sameAsChildren_ids: sameAsChildren.map(r => r.id),
+      simple_count: simple.length,
+      simple_ids: simple.map(r => r.id),
+      noPhoto_count: noPhoto.length,
+      noPhoto_ids: noPhoto.map(r => r.id),
+      withPhotoOrderById_count: withPhotoOrderById.length,
+      withPhotoOrderById_ids: withPhotoOrderById.map(r => r.id),
+      photoSizes: withPhotoOrderById.map(r => ({ id: r.id, photoLength: r.photo_base64 ? r.photo_base64.length : 0 })),
     }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (err) {
     return NextResponse.json({ error: err.message, stack: err.stack }, { status: 500 });
