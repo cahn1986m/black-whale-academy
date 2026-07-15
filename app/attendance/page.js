@@ -27,16 +27,28 @@ function getCameraErrorMessage(err) {
 function playBeep(ctx) {
   try {
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-    oscillator.type = 'sine';
-    oscillator.frequency.value = 880;
-    gain.gain.setValueAtTime(0.2, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
-    oscillator.connect(gain);
-    gain.connect(ctx.destination);
-    oscillator.start();
-    oscillator.stop(ctx.currentTime + 0.15);
+    const now = ctx.currentTime;
+    const beepDuration = 0.18;
+    const gap = 0.08;
+    // Two sharp square-wave beeps (harsher/richer in harmonics than a sine,
+    // so it cuts through loud ambient noise at the club) at a high, piercing
+    // pitch, loud enough to be heard without distorting typical speakers.
+    [0, beepDuration + gap].forEach((offset) => {
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
+      oscillator.type = 'square';
+      oscillator.frequency.value = 1800;
+      const start = now + offset;
+      const end = start + beepDuration;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.35, start + 0.01);
+      gain.gain.setValueAtTime(0.35, end - 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, end);
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+      oscillator.start(start);
+      oscillator.stop(end);
+    });
   } catch {}
 }
 
