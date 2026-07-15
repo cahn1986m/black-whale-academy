@@ -21,10 +21,22 @@ export async function GET(request) {
           ORDER BY full_name ASC
         `;
 
-    return NextResponse.json({ children }, {
+    const rawCount = await sql`SELECT COUNT(*)::int AS count FROM children`;
+
+    return NextResponse.json({
+      children,
+      _debug: {
+        childrenLength: children.length,
+        rawCountFromDb: rawCount[0].count,
+        groupIdParam: groupId,
+        gitCommit: process.env.VERCEL_GIT_COMMIT_SHA || 'unknown',
+        deploymentId: process.env.VERCEL_DEPLOYMENT_ID || 'unknown',
+        timestamp: new Date().toISOString(),
+      },
+    }, {
       headers: { 'Cache-Control': 'no-store, max-age=0' },
     });
   } catch (err) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err.message, stack: err.stack }, { status: 500 });
   }
 }
