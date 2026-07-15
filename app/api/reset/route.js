@@ -10,22 +10,19 @@ export async function POST(request) {
       return NextResponse.json({ error: 'تأكيد غير صحيح' }, { status: 400 });
     }
 
-    const beforeCount = await sql`SELECT COUNT(*)::int AS count FROM children`;
-
-    const deletedAttendance = await sql`DELETE FROM attendance RETURNING id`;
+    const deletedAttendance = await sql`DELETE FROM activity_attendance RETURNING id`;
+    const deletedEnrollments = await sql`DELETE FROM enrollments RETURNING id`;
     const deletedChildren = await sql`DELETE FROM children RETURNING id`;
-    const deletedGroups = await sql`DELETE FROM groups RETURNING id`;
-
-    const afterCount = await sql`SELECT COUNT(*)::int AS count FROM children`;
+    const deletedPackages = await sql`DELETE FROM activity_packages RETURNING id`;
+    const deletedActivities = await sql`DELETE FROM activities RETURNING id`;
 
     return NextResponse.json({
       success: true,
-      beforeCount: beforeCount[0].count,
-      afterCount: afterCount[0].count,
       deletedAttendanceCount: deletedAttendance.length,
+      deletedEnrollmentsCount: deletedEnrollments.length,
       deletedChildrenCount: deletedChildren.length,
-      deletedChildrenIds: deletedChildren.map(r => r.id),
-      deletedGroupsCount: deletedGroups.length,
+      deletedPackagesCount: deletedPackages.length,
+      deletedActivitiesCount: deletedActivities.length,
     }, {
       headers: { 'Cache-Control': 'no-store, max-age=0' },
     });

@@ -8,28 +8,28 @@ function todayStr() {
 }
 
 export default function HistoryPage() {
-  const [groups, setGroups] = useState([]);
-  const [groupId, setGroupId] = useState('');
+  const [activities, setActivities] = useState([]);
+  const [activityId, setActivityId] = useState('');
   const [date, setDate] = useState(todayStr());
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch('/api/groups', { cache: 'no-store' })
+    fetch('/api/activities', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((data) => setGroups(data.groups || []));
+      .then((data) => setActivities(data.activities || []));
   }, []);
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date, groupId]);
+  }, [date, activityId]);
 
   const load = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ date });
-      if (groupId) params.set('groupId', groupId);
+      if (activityId) params.set('activityId', activityId);
       const res = await fetch(`/api/attendance?${params.toString()}`, { cache: 'no-store' });
       const data = await res.json();
       setRecords(data.records || []);
@@ -63,11 +63,11 @@ export default function HistoryPage() {
       </div>
 
       <div className="field">
-        <label>المجموعة</label>
-        <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-          <option value="">كل المجموعات</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>{g.name}</option>
+        <label>النشاط</label>
+        <select value={activityId} onChange={(e) => setActivityId(e.target.value)}>
+          <option value="">كل الأنشطة</option>
+          {activities.map((a) => (
+            <option key={a.id} value={a.id}>{a.emoji ? `${a.emoji} ` : ''}{a.name}</option>
           ))}
         </select>
       </div>
@@ -80,13 +80,18 @@ export default function HistoryPage() {
       {loading && <div className="empty">جاري التحميل...</div>}
       {!loading && records.length === 0 && <div className="empty">ما في بيانات لهاليوم</div>}
       {records.map((r) => (
-        <div className="child-row" key={r.child_id}>
+        <div className="child-row" key={r.enrollment_id}>
           {r.photo_base64 ? (
             <img src={r.photo_base64} alt={r.full_name} />
           ) : (
             <div className="child-avatar-fallback">🧒</div>
           )}
-          <span className="name">{r.full_name}</span>
+          <span className="name">
+            {r.full_name}
+            {!activityId && r.activity_name && (
+              <span style={{ display: 'block', fontSize: 11, color: 'var(--text-dim)' }}>{r.activity_name}</span>
+            )}
+          </span>
           <span className={`status-pill ${r.status === 'present' ? 'present' : 'absent'}`}>
             {r.status === 'present' ? 'حاضر' : 'غايب'}
           </span>

@@ -53,8 +53,8 @@ function playBeep(ctx) {
 }
 
 export default function AttendancePage() {
-  const [groups, setGroups] = useState([]);
-  const [groupId, setGroupId] = useState('');
+  const [activities, setActivities] = useState([]);
+  const [activityId, setActivityId] = useState('');
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -67,27 +67,32 @@ export default function AttendancePage() {
   const audioCtxRef = useRef(null);
 
   useEffect(() => {
-    fetch('/api/groups', { cache: 'no-store' })
+    fetch('/api/activities', { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
-        setGroups(data.groups || []);
-        const saved = window.localStorage?.getItem?.('bwa_group_id');
-        if (saved && data.groups?.some((g) => String(g.id) === saved)) {
-          setGroupId(saved);
+        const withEnrollments = (data.activities || []).filter((a) => a.enrolled_count > 0);
+        setActivities(withEnrollments);
+        const saved = window.localStorage?.getItem?.('bwa_activity_id');
+        if (saved && withEnrollments.some((a) => String(a.id) === saved)) {
+          setActivityId(saved);
         }
       })
       .catch(() => {});
   }, []);
 
   useEffect(() => {
-    loadRecords();
-    try {
-      if (groupId) window.localStorage?.setItem?.('bwa_group_id', groupId);
-    } catch {}
-    const interval = setInterval(loadRecords, 15000);
-    return () => clearInterval(interval);
+    if (activityId) {
+      loadRecords();
+      try {
+        window.localStorage?.setItem?.('bwa_activity_id', activityId);
+      } catch {}
+      const interval = setInterval(loadRecords, 15000);
+      return () => clearInterval(interval);
+    } else {
+      setRecords([]);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId]);
+  }, [activityId]);
 
   // Warm the html5-qrcode module in the background so that when the user
   // clicks "start scan", the dynamic import resolves near-instantly and the
@@ -100,8 +105,7 @@ export default function AttendancePage() {
   const loadRecords = async () => {
     setLoading(true);
     try {
-      const url = groupId ? `/api/attendance?groupId=${groupId}` : '/api/attendance';
-      const res = await fetch(url, { cache: 'no-store' });
+      const res = await fetch(`/api/attendance?activityId=${activityId}`, { cache: 'no-store' });
       const data = await res.json();
       setRecords(data.records || []);
     } finally {
@@ -109,11 +113,11 @@ export default function AttendancePage() {
     }
   };
 
-  const markStatus = async (childId, status) => {
+  const markStatus = async (enrollmentId, status) => {
     await fetch('/api/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ childId, status }),
+      body: JSON.stringify({ enrollmentId, status }),
     });
     loadRecords();
   };
@@ -129,14 +133,18 @@ export default function AttendancePage() {
       const res = await fetch('/api/attendance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ qrToken: text, status: 'present' }),
+        body: JSON.stringify({ qrToken: text, activityId, status: 'present' }),
       });
       const data = await res.json();
       if (!res.ok) {
         setFlash({ type: 'error', text: data.error || 'كود غير معروف' });
       } else {
         if (audioCtxRef.current) playBeep(audioCtxRef.current);
-        setFlash({ type: 'success', text: `تم تسجيل ${data.child.full_name} حاضر ✓` });
+        if (data.sessionsRemaining != null && data.sessionsRemaining <= 0) {
+          setFlash({ type: 'error', text: `⚠️ تم تسجيل ${data.child.full_name} حاضر — لكن ما إله حصص متبقية (اطلب تجديد الاشتراك)` });
+        } else {
+          setFlash({ type: 'success', text: `تم تسجيل ${data.child.full_name} حاضر ✓` });
+        }
         loadRecords();
       }
     } catch {
@@ -296,58 +304,69 @@ export default function AttendancePage() {
       <Header sub="الحضور اليومي" />
 
       <div className="field">
-        <label>فلترة حسب المجموعة (اختياري)</label>
-        <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-          <option value="">كل المجموعات</option>
-          {groups.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name} {g.supervisor_name ? `(${g.supervisor_name})` : ''}
+        <label>اختر النشاط</label>
+        <select value={activityId} onChange={(e) => setActivityId(e.target.value)}>
+          <option value="">-- اختر نشاط --</option>
+          {activities.map((a) => (
+            <option key={a.id} value={a.id}>
+              {a.emoji ? `${a.emoji} ` : ''}{a.name} {a.instructor_name ? `(${a.instructor_name})` : ''}
             </option>
           ))}
         </select>
       </div>
 
-      <div className="summary-bar">
-        <span>حاضر اليوم</span>
-        <span className="count">{presentCount} / {records.length}</span>
-      </div>
+      {!activityId && <div className="empty">اختر النشاط أولاً للبدء بالمسح</div>}
 
-      {flash && <div className={`msg ${flash.type}`}>{flash.text}</div>}
-      {cameraError && <div className="msg error">{cameraError}</div>}
-
-      {!scanning ? (
-        <button className="btn" onClick={startScanner} type="button" disabled={starting}>
-          {starting ? 'جاري فتح الكاميرا...' : '📷 ابدأ مسح QR'}
-        </button>
-      ) : (
-        <button className="btn secondary" onClick={stopScanner} type="button">
-          إيقاف الكاميرا
-        </button>
-      )}
-
-      <div id="qr-reader" className="scanner-box" style={{ display: scanning ? 'block' : 'none', marginTop: 12 }} />
-
-      <div style={{ marginTop: 16 }}>
-        {loading && <div className="empty">جاري التحميل...</div>}
-        {!loading && records.length === 0 && <div className="empty">ما في أطفال بعد</div>}
-        {records.map((r) => (
-          <div className="child-row" key={r.child_id}>
-            {r.photo_base64 ? (
-              <img src={r.photo_base64} alt={r.full_name} />
-            ) : (
-              <div className="child-avatar-fallback">🧒</div>
-            )}
-            <span className="name">{r.full_name}</span>
-            <button
-              type="button"
-              className={`status-pill ${r.status === 'present' ? 'present' : 'absent'}`}
-              onClick={() => markStatus(r.child_id, r.status === 'present' ? 'absent' : 'present')}
-            >
-              {r.status === 'present' ? 'حاضر' : 'غايب'}
-            </button>
+      {activityId && (
+        <>
+          <div className="summary-bar">
+            <span>حاضر اليوم</span>
+            <span className="count">{presentCount} / {records.length}</span>
           </div>
-        ))}
-      </div>
+
+          {flash && <div className={`msg ${flash.type}`}>{flash.text}</div>}
+          {cameraError && <div className="msg error">{cameraError}</div>}
+
+          {!scanning ? (
+            <button className="btn" onClick={startScanner} type="button" disabled={starting}>
+              {starting ? 'جاري فتح الكاميرا...' : '📷 ابدأ مسح QR'}
+            </button>
+          ) : (
+            <button className="btn secondary" onClick={stopScanner} type="button">
+              إيقاف الكاميرا
+            </button>
+          )}
+
+          <div id="qr-reader" className="scanner-box" style={{ display: scanning ? 'block' : 'none', marginTop: 12 }} />
+
+          <div style={{ marginTop: 16 }}>
+            {loading && <div className="empty">جاري التحميل...</div>}
+            {!loading && records.length === 0 && <div className="empty">ما في أطفال مسجلين بهالنشاط بعد</div>}
+            {records.map((r) => (
+              <div className="child-row" key={r.enrollment_id}>
+                {r.photo_base64 ? (
+                  <img src={r.photo_base64} alt={r.full_name} />
+                ) : (
+                  <div className="child-avatar-fallback">🧒</div>
+                )}
+                <span className="name">
+                  {r.full_name}
+                  {r.sessions_remaining <= 0 && (
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--absent)' }}>خلصت الحصص</span>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  className={`status-pill ${r.status === 'present' ? 'present' : 'absent'}`}
+                  onClick={() => markStatus(r.enrollment_id, r.status === 'present' ? 'absent' : 'present')}
+                >
+                  {r.status === 'present' ? 'حاضر' : 'غايب'}
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }

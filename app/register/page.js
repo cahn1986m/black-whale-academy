@@ -36,10 +36,10 @@ function compressImage(file, maxSize = 300, quality = 0.7) {
 const MAX_PHOTO_SIZE_MB = 10;
 
 export default function RegisterPage() {
-  const [groups, setGroups] = useState([]);
+  const [activities, setActivities] = useState([]);
   const [fullName, setFullName] = useState('');
   const [parentContact, setParentContact] = useState('');
-  const [groupId, setGroupId] = useState('');
+  const [selected, setSelected] = useState({}); // { [activityId]: packageId }
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoBase64, setPhotoBase64] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -47,11 +47,28 @@ export default function RegisterPage() {
   const [result, setResult] = useState(null);
 
   useEffect(() => {
-    fetch('/api/groups')
+    fetch('/api/activities', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((data) => setGroups(data.groups || []))
+      .then((data) => setActivities(data.activities || []))
       .catch(() => {});
   }, []);
+
+  const toggleActivity = (activityId, checked) => {
+    setSelected((prev) => {
+      const next = { ...prev };
+      if (checked) {
+        const activity = activities.find((a) => a.id === activityId);
+        next[activityId] = activity?.packages?.[0]?.id || '';
+      } else {
+        delete next[activityId];
+      }
+      return next;
+    });
+  };
+
+  const setPackageForActivity = (activityId, packageId) => {
+    setSelected((prev) => ({ ...prev, [activityId]: packageId }));
+  };
 
   const handlePhoto = async (e) => {
     const file = e.target.files?.[0];
@@ -81,6 +98,10 @@ export default function RegisterPage() {
       setError('اسم الطفل مطلوب');
       return;
     }
+    const selections = Object.entries(selected)
+      .filter(([, packageId]) => packageId)
+      .map(([activityId, packageId]) => ({ activityId: Number(activityId), packageId: Number(packageId) }));
+
     setSubmitting(true);
     try {
       const res = await fetch('/api/register', {
@@ -89,8 +110,8 @@ export default function RegisterPage() {
         body: JSON.stringify({
           fullName: fullName.trim(),
           parentContact: parentContact.trim(),
-          groupId: groupId || null,
           photoBase64,
+          selections,
         }),
       });
       const data = await res.json();
@@ -149,17 +170,6 @@ export default function RegisterPage() {
             />
           </div>
           <div className="field">
-            <label>المجموعة</label>
-            <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-              <option value="">بدون تحديد (رح يحددها المشرف لاحقاً)</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
             <label>صورة الطفل</label>
             <div className="photo-input">
               {photoPreview ? (
@@ -171,6 +181,52 @@ export default function RegisterPage() {
             </div>
           </div>
         </div>
+
+        <div className="card">
+          <div style={{ fontWeight: 'bold', marginBottom: 12 }}>الأنشطة (اختياري — ممكن تختار أكتر من نشاط)</div>
+          {activities.length === 0 && <div className="empty">لا يوجد أنشطة متاحة حالياً</div>}
+          {activities.map((a) => {
+            const isChecked = Object.prototype.hasOwnProperty.call(selected, a.id);
+            const hasPackages = a.packages && a.packages.length > 0;
+            return (
+              <div key={a.id} className="field" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 12 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: hasPackages ? 'pointer' : 'default' }}>
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    disabled={!hasPackages}
+                    onChange={(e) => toggleActivity(a.id, e.target.checked)}
+                  />
+                  <span>
+                    {a.emoji ? `${a.emoji} ` : ''}{a.name}
+                    {a.schedule_text && (
+                      <span style={{ display: 'block', fontSize: 12, color: 'var(--text-dim)', fontWeight: 'normal' }}>
+                        {a.schedule_text}
+                      </span>
+                    )}
+                  </span>
+                </label>
+                {!hasPackages && (
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>لسا ما في باقات متاحة لهالنشاط</div>
+                )}
+                {isChecked && hasPackages && (
+                  <select
+                    value={selected[a.id] || ''}
+                    onChange={(e) => setPackageForActivity(a.id, e.target.value)}
+                    style={{ marginTop: 8 }}
+                  >
+                    {a.packages.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.session_count} حصص — {p.price} درهم
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
         <button className="btn" type="submit" disabled={submitting}>
           {submitting ? 'جاري التسجيل...' : 'تسجيل'}
         </button>
