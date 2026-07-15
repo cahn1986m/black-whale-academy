@@ -23,16 +23,7 @@ export async function GET(request) {
           ORDER BY id ASC
         `;
 
-    return NextResponse.json({
-      children,
-      _meta: {
-        region: process.env.VERCEL_REGION || 'unknown',
-        deploymentId: process.env.VERCEL_DEPLOYMENT_ID || 'unknown',
-        gitCommit: process.env.VERCEL_GIT_COMMIT_SHA || 'unknown',
-        timestamp: new Date().toISOString(),
-        dbUrlHost: (process.env.DATABASE_URL || '').match(/@([^/]+)\//)?.[1] || 'unknown',
-      },
-    }, {
+    return NextResponse.json({ children }, {
       status: 200,
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0, s-maxage=0',
