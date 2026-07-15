@@ -3,12 +3,59 @@
 import { useEffect, useState } from 'react';
 import Header from '../Header';
 
+const DEFAULT_ACTIVITIES = [
+  {
+    name: 'السباحة',
+    emoji: '🏊',
+    scheduleText: 'يومياً 4:00–9:00 مساءً، السبت والأحد 9:00 صباحاً–2:00 ظهراً',
+    packages: [{ sessionCount: 8, price: 300 }, { sessionCount: 12, price: 400 }],
+  },
+  {
+    name: 'Baby Swimming',
+    emoji: '👶',
+    scheduleText: 'من عمر 6 أشهر فأكثر — مدة الحصة 30 دقيقة',
+    packages: [{ sessionCount: 8, price: 599 }],
+  },
+  {
+    name: 'كرة القدم',
+    emoji: '⚽',
+    scheduleText: 'السبت-الإثنين-الأربعاء 6:00–9:00 مساءً (ساعة لكل مجموعة)',
+    packages: [],
+  },
+  {
+    name: 'كرة السلة',
+    emoji: '🏀',
+    scheduleText: 'السبت-الإثنين-الأربعاء 6:00–9:00 مساءً (ساعة لكل مجموعة)',
+    packages: [{ sessionCount: 12, price: 250 }],
+  },
+  {
+    name: 'الجمباز',
+    emoji: '🤸',
+    scheduleText: 'السبت-الإثنين-الأربعاء',
+    packages: [{ sessionCount: 8, price: 250 }],
+  },
+  {
+    name: 'الكاراتيه',
+    emoji: '🥋',
+    scheduleText: 'الأحد-الثلاثاء-الخميس',
+    packages: [{ sessionCount: 12, price: 250 }],
+  },
+  {
+    name: 'الكيك بوكسينج',
+    emoji: '🥊',
+    scheduleText: 'السبت-الإثنين-الأربعاء',
+    packages: [{ sessionCount: 12, price: 300 }],
+  },
+];
+
 export default function AdminPage() {
   const [activities, setActivities] = useState([]);
   const [children, setChildren] = useState([]);
   const [activityForm, setActivityForm] = useState({ name: '', emoji: '', instructorName: '', scheduleText: '' });
   const [packageDraft, setPackageDraft] = useState({}); // { [activityId]: { sessionCount, price } }
   const [savingActivity, setSavingActivity] = useState(false);
+  const [showActivityDetails, setShowActivityDetails] = useState(false);
+  const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState('');
   const [resetting, setResetting] = useState(false);
 
@@ -59,6 +106,42 @@ export default function AdminPage() {
       setError(err.message);
     } finally {
       setSavingActivity(false);
+    }
+  };
+
+  const seedDefaultActivities = async () => {
+    const existingNames = new Set(activities.map((a) => a.name));
+    const toCreate = DEFAULT_ACTIVITIES.filter((a) => !existingNames.has(a.name));
+    if (toCreate.length === 0) {
+      alert('كل الأنشطة السبعة موجودة أصلاً.');
+      return;
+    }
+    if (!window.confirm(`رح تنضاف ${toCreate.length} أنشطة (مع باقاتها) دفعة وحدة. أكمل؟`)) return;
+
+    setSeeding(true);
+    try {
+      for (const def of toCreate) {
+        const res = await fetch('/api/activities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: def.name, emoji: def.emoji, scheduleText: def.scheduleText }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert(`صار خطأ بإضافة "${def.name}": ${data.error}`);
+          continue;
+        }
+        for (const pkg of def.packages) {
+          await fetch(`/api/activities/${data.activity.id}/packages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionCount: pkg.sessionCount, price: pkg.price }),
+          });
+        }
+      }
+      load();
+    } finally {
+      setSeeding(false);
     }
   };
 
@@ -213,46 +296,72 @@ export default function AdminPage() {
       <a href="/" className="back-link">← الرئيسية</a>
       <Header sub="إدارة الأنشطة والأطفال" />
 
+      <button
+        className="btn secondary"
+        type="button"
+        onClick={seedDefaultActivities}
+        disabled={seeding}
+        style={{ marginBottom: 14 }}
+      >
+        {seeding ? 'جاري التعبئة...' : '🚀 تعبئة الأنشطة السبعة تلقائياً (من الإعلان)'}
+      </button>
+
       <div className="card">
         <div style={{ fontWeight: 'bold', marginBottom: 12 }}>إضافة نشاط جديد</div>
         {error && <div className="msg error">{error}</div>}
         <form onSubmit={addActivity}>
-          <div className="field">
-            <label>اسم النشاط</label>
-            <input
-              type="text"
-              value={activityForm.name}
-              onChange={(e) => setActivityForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="مثال: السباحة"
-            />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div className="field" style={{ flex: 1 }}>
+              <label>اسم النشاط</label>
+              <input
+                type="text"
+                value={activityForm.name}
+                onChange={(e) => setActivityForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="مثال: السباحة"
+              />
+            </div>
+            <div className="field" style={{ width: 70 }}>
+              <label>إيموجي</label>
+              <input
+                type="text"
+                value={activityForm.emoji}
+                onChange={(e) => setActivityForm((f) => ({ ...f, emoji: e.target.value }))}
+                placeholder="🏊"
+              />
+            </div>
           </div>
-          <div className="field">
-            <label>إيموجي (اختياري)</label>
-            <input
-              type="text"
-              value={activityForm.emoji}
-              onChange={(e) => setActivityForm((f) => ({ ...f, emoji: e.target.value }))}
-              placeholder="🏊"
-            />
-          </div>
-          <div className="field">
-            <label>اسم المدرب/ة (اختياري)</label>
-            <input
-              type="text"
-              value={activityForm.instructorName}
-              onChange={(e) => setActivityForm((f) => ({ ...f, instructorName: e.target.value }))}
-              placeholder="اسم المدرب"
-            />
-          </div>
-          <div className="field">
-            <label>المواعيد (اختياري)</label>
-            <input
-              type="text"
-              value={activityForm.scheduleText}
-              onChange={(e) => setActivityForm((f) => ({ ...f, scheduleText: e.target.value }))}
-              placeholder="مثال: السبت-الإثنين-الأربعاء 6-9 مساءً"
-            />
-          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowActivityDetails((v) => !v)}
+            style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 13, padding: 0, marginBottom: 12, cursor: 'pointer' }}
+          >
+            {showActivityDetails ? '− إخفاء التفاصيل الإضافية' : '+ تفاصيل إضافية (المدرب، المواعيد)'}
+          </button>
+
+          {showActivityDetails && (
+            <>
+              <div className="field">
+                <label>اسم المدرب/ة (اختياري)</label>
+                <input
+                  type="text"
+                  value={activityForm.instructorName}
+                  onChange={(e) => setActivityForm((f) => ({ ...f, instructorName: e.target.value }))}
+                  placeholder="اسم المدرب"
+                />
+              </div>
+              <div className="field">
+                <label>المواعيد (اختياري)</label>
+                <input
+                  type="text"
+                  value={activityForm.scheduleText}
+                  onChange={(e) => setActivityForm((f) => ({ ...f, scheduleText: e.target.value }))}
+                  placeholder="مثال: السبت-الإثنين-الأربعاء 6-9 مساءً"
+                />
+              </div>
+            </>
+          )}
+
           <button className="btn" type="submit" disabled={savingActivity}>
             {savingActivity ? 'جاري الإضافة...' : 'إضافة النشاط'}
           </button>
