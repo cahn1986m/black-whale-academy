@@ -14,7 +14,18 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="ar" dir="rtl">
-      <body>{children}</body>
+      <body>
+        <div className="bg-decor" aria-hidden="true">
+          <span>🏊</span>
+          <span>⚽</span>
+          <span>🏀</span>
+          <span>🤸</span>
+          <span>🥋</span>
+          <span>🥊</span>
+          <span>🌊</span>
+        </div>
+        {children}
+      </body>
     </html>
   );
 }
