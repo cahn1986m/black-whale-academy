@@ -99,11 +99,12 @@ input, select, textarea {
 }
 
 .header .brand-logo {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  object-fit: cover;
-  background: #000;
+  width: 54px;
+  height: 54px;
+  border-radius: 12px;
+  object-fit: contain;
+  background: #fff;
+  border: 1px solid var(--border);
   flex-shrink: 0;
 }
 
