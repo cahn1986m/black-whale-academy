@@ -10,6 +10,7 @@ export default function AdminPage() {
   const [supervisorName, setSupervisorName] = useState('');
   const [savingGroup, setSavingGroup] = useState(false);
   const [error, setError] = useState('');
+  const [resetting, setResetting] = useState(false);
 
   const load = async () => {
     const [gRes, cRes] = await Promise.all([
@@ -63,6 +64,30 @@ export default function AdminPage() {
     load();
   };
 
+  const resetAllData = async () => {
+    const typed = window.prompt('هاد الإجراء رح يمسح كل الأطفال والمجموعات وسجلات الحضور نهائياً ومايمكن التراجع. للتأكيد، اكتب بالضبط: DELETE ALL');
+    if (typed !== 'DELETE ALL') {
+      if (typed !== null) alert('النص غير مطابق. تم الإلغاء.');
+      return;
+    }
+    setResetting(true);
+    try {
+      const res = await fetch('/api/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'DELETE ALL' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      alert('تم حذف كل البيانات بنجاح.');
+      load();
+    } catch (err) {
+      alert('صار خطأ: ' + err.message);
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const unassigned = children.filter((c) => !c.group_id);
 
   return (
@@ -105,6 +130,15 @@ export default function AdminPage() {
 
       <button className="btn secondary" type="button" onClick={load} style={{ marginTop: 8 }}>
         🔄 تحديث القوائم
+      </button>
+      <button
+        className="btn secondary"
+        type="button"
+        onClick={resetAllData}
+        disabled={resetting}
+        style={{ marginTop: 8, marginInlineStart: 8, borderColor: 'var(--absent)', color: 'var(--absent)' }}
+      >
+        {resetting ? 'جاري الحذف...' : '🗑️ حذف كل البيانات'}
       </button>
 
       <div style={{ fontWeight: 'bold', margin: '22px 0 10px' }}>
