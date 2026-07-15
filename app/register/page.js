@@ -106,6 +106,7 @@ export default function RegisterPage() {
   if (result) {
     return (
       <div className="page">
+        <a href="/" className="back-link">← الرئيسية</a>
         <Header sub="تم التسجيل بنجاح" />
         <div className="msg success">
           تم تسجيل {result.full_name} بنجاح ✓ — هاد الكود الخاص فيه، احتفظوا فيه أو صوروه، رح يُستخدم لتسجيل الحضور يومياً.
@@ -124,6 +125,7 @@ export default function RegisterPage() {
 
   return (
     <div className="page">
+      <a href="/" className="back-link">← الرئيسية</a>
       <Header sub="نموذج تسجيل طفل جديد" />
       {error && <div className="msg error">{error}</div>}
       <form onSubmit={submit}>
