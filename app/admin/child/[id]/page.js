@@ -9,12 +9,13 @@ export default function ChildBadgePage({ params }) {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch(`/api/children/${params.id}`)
+    fetch(`/api/children/${params.id}`, { cache: 'no-store' })
       .then((r) => r.json())
       .then((data) => {
         if (data.error) setError(data.error);
         else setChild(data.child);
-      });
+      })
+      .catch(() => setError('صار خطأ بالاتصال — تأكد من الإنترنت وحاول مرة تانية'));
   }, [params.id]);
 
   return (

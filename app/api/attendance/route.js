@@ -3,6 +3,8 @@ import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+const VALID_STATUSES = ['present', 'absent'];
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -40,13 +42,14 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const date = body.date || todayStr();
-    const status = body.status || 'present';
+    const status = VALID_STATUSES.includes(body.status) ? body.status : 'present';
+    const qrToken = typeof body.qrToken === 'string' ? body.qrToken.trim() : '';
     let childId = body.childId ? Number(body.childId) : null;
 
-    if (!childId && body.qrToken) {
-      const [child] = await sql`SELECT id FROM children WHERE qr_token = ${body.qrToken}`;
+    if (!childId && qrToken) {
+      const [child] = await sql`SELECT id FROM children WHERE qr_token = ${qrToken}`;
       if (!child) {
         return NextResponse.json({ error: 'الكود غير معروف — تأكد من مسح QR الصحيح' }, { status: 404 });
       }
@@ -57,13 +60,21 @@ export async function POST(request) {
       return NextResponse.json({ error: 'لازم رقم الطفل أو كود QR' }, { status: 400 });
     }
 
-    const [record] = await sql`
-      INSERT INTO attendance (child_id, attendance_date, status)
-      VALUES (${childId}, ${date}, ${status})
-      ON CONFLICT (child_id, attendance_date)
-      DO UPDATE SET status = ${status}, marked_at = now()
-      RETURNING child_id, attendance_date, status, marked_at
-    `;
+    let record;
+    try {
+      [record] = await sql`
+        INSERT INTO attendance (child_id, attendance_date, status)
+        VALUES (${childId}, ${date}, ${status})
+        ON CONFLICT (child_id, attendance_date)
+        DO UPDATE SET status = ${status}, marked_at = now()
+        RETURNING child_id, attendance_date, status, marked_at
+      `;
+    } catch (err) {
+      if (err.code === '23503') {
+        return NextResponse.json({ error: 'الطفل ما عاد موجود بالنظام' }, { status: 404 });
+      }
+      throw err;
+    }
 
     const [child] = await sql`SELECT id, full_name, group_id FROM children WHERE id = ${childId}`;
 

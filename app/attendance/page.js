@@ -5,14 +5,36 @@ import Header from '../Header';
 
 const SCAN_COOLDOWN_MS = 2500;
 
+const CAMERA_ERROR_MESSAGES = {
+  NotAllowedError: 'تم رفض إذن الكاميرا. فعّل إذن الكاميرا من إعدادات المتصفح ثم حاول مرة تانية.',
+  PermissionDeniedError: 'تم رفض إذن الكاميرا. فعّل إذن الكاميرا من إعدادات المتصفح ثم حاول مرة تانية.',
+  NotFoundError: 'ما في كاميرا متوفرة على هالجهاز.',
+  DevicesNotFoundError: 'ما في كاميرا متوفرة على هالجهاز.',
+  NotReadableError: 'الكاميرا مستخدمة حالياً من تطبيق تاني. سكّر التطبيقات التانية وجرب مرة كمان.',
+  TrackStartError: 'الكاميرا مستخدمة حالياً من تطبيق تاني. سكّر التطبيقات التانية وجرب مرة كمان.',
+  OverconstrainedError: 'ما قدرنا نفتح الكاميرا المطلوبة على هالجهاز.',
+  SecurityError: 'لازم تفتح الموقع عبر رابط آمن (HTTPS) عشان تشتغل الكاميرا.',
+};
+
+function getCameraErrorMessage(err) {
+  if (!err) return 'ما قدرنا نفتح الكاميرا لسبب غير معروف.';
+  const name = err.name || '';
+  if (CAMERA_ERROR_MESSAGES[name]) return CAMERA_ERROR_MESSAGES[name];
+  const detail = err.message || (typeof err === 'string' ? err : '');
+  return detail ? `ما قدرنا نفتح الكاميرا: ${detail}` : 'ما قدرنا نفتح الكاميرا.';
+}
+
 export default function AttendancePage() {
   const [groups, setGroups] = useState([]);
   const [groupId, setGroupId] = useState('');
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [cameraError, setCameraError] = useState('');
   const [flash, setFlash] = useState(null);
   const scannerRef = useRef(null);
+  const stopRequestedRef = useRef(false);
   const lastScanRef = useRef({ code: null, time: 0 });
 
   useEffect(() => {
@@ -41,6 +63,14 @@ export default function AttendancePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
+
+  // Warm the html5-qrcode module in the background so that when the user
+  // clicks "start scan", the dynamic import resolves near-instantly and the
+  // getUserMedia call stays tied to the click's user-activation window
+  // (required by Safari/iOS to show the camera permission prompt).
+  useEffect(() => {
+    import('html5-qrcode').catch(() => {});
+  }, []);
 
   const loadRecords = async () => {
     setLoading(true);
@@ -89,35 +119,131 @@ export default function AttendancePage() {
   };
 
   const startScanner = async () => {
+    if (starting || scanning) return;
+
+    setCameraError('');
+
+    if (typeof window === 'undefined' || !window.isSecureContext) {
+      setCameraError('لازم تفتح الموقع عبر رابط آمن (HTTPS) عشان تشتغل الكاميرا.');
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('المتصفح ما بيدعم الوصول للكاميرا.');
+      return;
+    }
+
+    stopRequestedRef.current = false;
+    setStarting(true);
+    // Reveal the scanner container first so html5-qrcode can measure it
+    // and size the video feed correctly once the camera starts.
     setScanning(true);
+
     const { Html5Qrcode } = await import('html5-qrcode');
     const instance = new Html5Qrcode('qr-reader');
     scannerRef.current = instance;
-    try {
-      await instance.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: 220 },
-        (decodedText) => onDecoded(decodedText),
-        () => {}
-      );
-    } catch (err) {
-      setFlash({ type: 'error', text: 'ما قدرنا نفتح الكاميرا — تأكد من إذن الوصول' });
+
+    const config = { fps: 10, qrbox: 220 };
+    const onScanFailure = () => {};
+
+    // Try the back camera first (ideal, not exact — degrades gracefully),
+    // then the front camera, then whatever device is available (laptops
+    // without a rear camera, etc).
+    const attempts = [
+      { facingMode: { exact: 'environment' } },
+      { facingMode: 'environment' },
+      { facingMode: 'user' },
+    ];
+
+    let started = false;
+    let lastError = null;
+
+    for (const cameraConfig of attempts) {
+      try {
+        await instance.start(cameraConfig, config, onDecoded, onScanFailure);
+        started = true;
+        break;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    if (!started) {
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        if (cameras && cameras.length > 0) {
+          await instance.start(cameras[0].id, config, onDecoded, onScanFailure);
+          started = true;
+        }
+      } catch (err) {
+        lastError = err;
+      }
+    }
+
+    setStarting(false);
+
+    if (started && stopRequestedRef.current) {
+      // User hit "stop" while the camera was still negotiating — honor it now.
+      try {
+        await instance.stop();
+      } catch {}
+      try {
+        await instance.clear();
+      } catch {}
+      scannerRef.current = null;
       setScanning(false);
+      return;
+    }
+
+    if (!started) {
+      scannerRef.current = null;
+      setScanning(false);
+      setCameraError(getCameraErrorMessage(lastError));
     }
   };
 
   const stopScanner = async () => {
-    try {
-      await scannerRef.current?.stop();
-      await scannerRef.current?.clear();
-    } catch {}
+    stopRequestedRef.current = true;
+
+    if (starting) {
+      // Camera still negotiating; startScanner will clean up once it settles.
+      setScanning(false);
+      return;
+    }
+
+    const instance = scannerRef.current;
+    scannerRef.current = null;
     setScanning(false);
+    if (!instance) return;
+    try {
+      await instance.stop();
+    } catch {}
+    try {
+      await instance.clear();
+    } catch {}
   };
 
   useEffect(() => {
-    return () => {
-      scannerRef.current?.stop().catch(() => {});
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopScanner();
+      }
     };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      stopRequestedRef.current = true;
+      const instance = scannerRef.current;
+      scannerRef.current = null;
+      if (instance) {
+        instance
+          .stop()
+          .catch(() => {})
+          .finally(() => {
+            instance.clear().catch(() => {});
+          });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const presentCount = records.filter((r) => r.status === 'present').length;
@@ -147,10 +273,11 @@ export default function AttendancePage() {
           </div>
 
           {flash && <div className={`msg ${flash.type}`}>{flash.text}</div>}
+          {cameraError && <div className="msg error">{cameraError}</div>}
 
           {!scanning ? (
-            <button className="btn" onClick={startScanner} type="button">
-              📷 ابدأ مسح QR
+            <button className="btn" onClick={startScanner} type="button" disabled={starting}>
+              {starting ? 'جاري فتح الكاميرا...' : '📷 ابدأ مسح QR'}
             </button>
           ) : (
             <button className="btn secondary" onClick={stopScanner} type="button">

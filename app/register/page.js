@@ -33,6 +33,8 @@ function compressImage(file, maxSize = 300, quality = 0.7) {
   });
 }
 
+const MAX_PHOTO_SIZE_MB = 10;
+
 export default function RegisterPage() {
   const [groups, setGroups] = useState([]);
   const [fullName, setFullName] = useState('');
@@ -54,10 +56,19 @@ export default function RegisterPage() {
   const handlePhoto = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('لازم تختار ملف صورة');
+      return;
+    }
+    if (file.size > MAX_PHOTO_SIZE_MB * 1024 * 1024) {
+      setError(`حجم الصورة كبير، الحد الأقصى ${MAX_PHOTO_SIZE_MB} ميغا`);
+      return;
+    }
     try {
       const compressed = await compressImage(file);
       setPhotoBase64(compressed);
       setPhotoPreview(compressed);
+      setError('');
     } catch {
       setError('ما قدرنا نحمّل الصورة، جرب صورة تانية');
     }
@@ -76,8 +87,8 @@ export default function RegisterPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          fullName,
-          parentContact,
+          fullName: fullName.trim(),
+          parentContact: parentContact.trim(),
           groupId: groupId || null,
           photoBase64,
         }),
