@@ -24,31 +24,59 @@ function getCameraErrorMessage(err) {
   return detail ? `ما قدرنا نفتح الكاميرا: ${detail}` : 'ما قدرنا نفتح الكاميرا.';
 }
 
-function playBeep(ctx) {
+function playTone(ctx, { start, duration, freq, type = 'square', peakGain = 0.35 }) {
+  const oscillator = ctx.createOscillator();
+  const gain = ctx.createGain();
+  oscillator.type = type;
+  oscillator.frequency.value = freq;
+  const end = start + duration;
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(peakGain, start + Math.min(0.01, duration / 4));
+  gain.gain.setValueAtTime(peakGain, Math.max(start, end - Math.min(0.03, duration / 4)));
+  gain.gain.exponentialRampToValueAtTime(0.0001, end);
+  oscillator.connect(gain);
+  gain.connect(ctx.destination);
+  oscillator.start(start);
+  oscillator.stop(end);
+}
+
+// Successful scan, sessions still available: two sharp high-pitched
+// square-wave beeps — harsh/rich in harmonics so it cuts through loud
+// ambient noise at the club, distinct in pitch and rhythm from the other two.
+function playSuccessBeep(ctx) {
   try {
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const now = ctx.currentTime;
-    const beepDuration = 0.18;
+    const duration = 0.18;
     const gap = 0.08;
-    // Two sharp square-wave beeps (harsher/richer in harmonics than a sine,
-    // so it cuts through loud ambient noise at the club) at a high, piercing
-    // pitch, loud enough to be heard without distorting typical speakers.
-    [0, beepDuration + gap].forEach((offset) => {
-      const oscillator = ctx.createOscillator();
-      const gain = ctx.createGain();
-      oscillator.type = 'square';
-      oscillator.frequency.value = 1800;
-      const start = now + offset;
-      const end = start + beepDuration;
-      gain.gain.setValueAtTime(0.0001, start);
-      gain.gain.exponentialRampToValueAtTime(0.35, start + 0.01);
-      gain.gain.setValueAtTime(0.35, end - 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, end);
-      oscillator.connect(gain);
-      gain.connect(ctx.destination);
-      oscillator.start(start);
-      oscillator.stop(end);
-    });
+    playTone(ctx, { start: now, duration, freq: 1800 });
+    playTone(ctx, { start: now + duration + gap, duration, freq: 1800 });
+  } catch {}
+}
+
+// Recognized child, attendance recorded, but their sessions are used up:
+// three quick mid-pitched beeps — a distinct "pay attention" rhythm,
+// lower and busier than the two-beep success sound.
+function playWarningBeep(ctx) {
+  try {
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const now = ctx.currentTime;
+    const duration = 0.1;
+    const gap = 0.06;
+    for (let i = 0; i < 3; i++) {
+      playTone(ctx, { start: now + i * (duration + gap), duration, freq: 1100 });
+    }
+  } catch {}
+}
+
+// Unknown/invalid QR code (or not enrolled in this activity) — a single
+// long, low buzz, unmistakably different from the two success/warning
+// tones (low pitch + sawtooth "wrong" timbre + sustained length).
+function playErrorBeep(ctx) {
+  try {
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const now = ctx.currentTime;
+    playTone(ctx, { start: now, duration: 0.5, freq: 260, type: 'sawtooth', peakGain: 0.3 });
   } catch {}
 }
 
@@ -137,17 +165,19 @@ export default function AttendancePage() {
       });
       const data = await res.json();
       if (!res.ok) {
+        if (audioCtxRef.current) playErrorBeep(audioCtxRef.current);
         setFlash({ type: 'error', text: data.error || 'كود غير معروف' });
+      } else if (data.sessionsRemaining != null && data.sessionsRemaining <= 0) {
+        if (audioCtxRef.current) playWarningBeep(audioCtxRef.current);
+        setFlash({ type: 'error', text: `⚠️ تم تسجيل ${data.child.full_name} حاضر — لكن ما إله حصص متبقية (اطلب تجديد الاشتراك)` });
+        loadRecords();
       } else {
-        if (audioCtxRef.current) playBeep(audioCtxRef.current);
-        if (data.sessionsRemaining != null && data.sessionsRemaining <= 0) {
-          setFlash({ type: 'error', text: `⚠️ تم تسجيل ${data.child.full_name} حاضر — لكن ما إله حصص متبقية (اطلب تجديد الاشتراك)` });
-        } else {
-          setFlash({ type: 'success', text: `تم تسجيل ${data.child.full_name} حاضر ✓` });
-        }
+        if (audioCtxRef.current) playSuccessBeep(audioCtxRef.current);
+        setFlash({ type: 'success', text: `تم تسجيل ${data.child.full_name} حاضر ✓` });
         loadRecords();
       }
     } catch {
+      if (audioCtxRef.current) playErrorBeep(audioCtxRef.current);
       setFlash({ type: 'error', text: 'صار خطأ بالاتصال' });
     }
     setTimeout(() => setFlash(null), 2200);
