@@ -51,16 +51,12 @@ export default function AttendancePage() {
   }, []);
 
   useEffect(() => {
-    if (groupId) {
-      loadRecords();
-      try {
-        window.localStorage?.setItem?.('bwa_group_id', groupId);
-      } catch {}
-      const interval = setInterval(loadRecords, 15000);
-      return () => clearInterval(interval);
-    } else {
-      setRecords([]);
-    }
+    loadRecords();
+    try {
+      if (groupId) window.localStorage?.setItem?.('bwa_group_id', groupId);
+    } catch {}
+    const interval = setInterval(loadRecords, 15000);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
@@ -75,7 +71,8 @@ export default function AttendancePage() {
   const loadRecords = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/attendance?groupId=${groupId}`, { cache: 'no-store' });
+      const url = groupId ? `/api/attendance?groupId=${groupId}` : '/api/attendance';
+      const res = await fetch(url, { cache: 'no-store' });
       const data = await res.json();
       setRecords(data.records || []);
     } finally {
@@ -254,9 +251,9 @@ export default function AttendancePage() {
       <Header sub="الحضور اليومي" />
 
       <div className="field">
-        <label>اختر مجموعتك</label>
+        <label>فلترة حسب المجموعة (اختياري)</label>
         <select value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-          <option value="">-- اختر مجموعة --</option>
+          <option value="">كل المجموعات</option>
           {groups.map((g) => (
             <option key={g.id} value={g.id}>
               {g.name} {g.supervisor_name ? `(${g.supervisor_name})` : ''}
@@ -265,51 +262,47 @@ export default function AttendancePage() {
         </select>
       </div>
 
-      {groupId && (
-        <>
-          <div className="summary-bar">
-            <span>حاضر اليوم</span>
-            <span className="count">{presentCount} / {records.length}</span>
-          </div>
+      <div className="summary-bar">
+        <span>حاضر اليوم</span>
+        <span className="count">{presentCount} / {records.length}</span>
+      </div>
 
-          {flash && <div className={`msg ${flash.type}`}>{flash.text}</div>}
-          {cameraError && <div className="msg error">{cameraError}</div>}
+      {flash && <div className={`msg ${flash.type}`}>{flash.text}</div>}
+      {cameraError && <div className="msg error">{cameraError}</div>}
 
-          {!scanning ? (
-            <button className="btn" onClick={startScanner} type="button" disabled={starting}>
-              {starting ? 'جاري فتح الكاميرا...' : '📷 ابدأ مسح QR'}
-            </button>
-          ) : (
-            <button className="btn secondary" onClick={stopScanner} type="button">
-              إيقاف الكاميرا
-            </button>
-          )}
-
-          <div id="qr-reader" className="scanner-box" style={{ display: scanning ? 'block' : 'none', marginTop: 12 }} />
-
-          <div style={{ marginTop: 16 }}>
-            {loading && <div className="empty">جاري التحميل...</div>}
-            {!loading && records.length === 0 && <div className="empty">ما في أطفال بهاي المجموعة بعد</div>}
-            {records.map((r) => (
-              <div className="child-row" key={r.child_id}>
-                {r.photo_base64 ? (
-                  <img src={r.photo_base64} alt={r.full_name} />
-                ) : (
-                  <div className="child-avatar-fallback">🧒</div>
-                )}
-                <span className="name">{r.full_name}</span>
-                <button
-                  type="button"
-                  className={`status-pill ${r.status === 'present' ? 'present' : 'absent'}`}
-                  onClick={() => markStatus(r.child_id, r.status === 'present' ? 'absent' : 'present')}
-                >
-                  {r.status === 'present' ? 'حاضر' : 'غايب'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </>
+      {!scanning ? (
+        <button className="btn" onClick={startScanner} type="button" disabled={starting}>
+          {starting ? 'جاري فتح الكاميرا...' : '📷 ابدأ مسح QR'}
+        </button>
+      ) : (
+        <button className="btn secondary" onClick={stopScanner} type="button">
+          إيقاف الكاميرا
+        </button>
       )}
+
+      <div id="qr-reader" className="scanner-box" style={{ display: scanning ? 'block' : 'none', marginTop: 12 }} />
+
+      <div style={{ marginTop: 16 }}>
+        {loading && <div className="empty">جاري التحميل...</div>}
+        {!loading && records.length === 0 && <div className="empty">ما في أطفال بعد</div>}
+        {records.map((r) => (
+          <div className="child-row" key={r.child_id}>
+            {r.photo_base64 ? (
+              <img src={r.photo_base64} alt={r.full_name} />
+            ) : (
+              <div className="child-avatar-fallback">🧒</div>
+            )}
+            <span className="name">{r.full_name}</span>
+            <button
+              type="button"
+              className={`status-pill ${r.status === 'present' ? 'present' : 'absent'}`}
+              onClick={() => markStatus(r.child_id, r.status === 'present' ? 'absent' : 'present')}
+            >
+              {r.status === 'present' ? 'حاضر' : 'غايب'}
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
