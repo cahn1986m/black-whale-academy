@@ -250,6 +250,15 @@ input, select, textarea {
   overflow: hidden;
   border: 1px solid var(--border);
   margin-bottom: 14px;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  position: relative;
+}
+
+.scanner-box video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
 }
 
 .badge-card {

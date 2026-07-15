@@ -24,6 +24,22 @@ function getCameraErrorMessage(err) {
   return detail ? `ما قدرنا نفتح الكاميرا: ${detail}` : 'ما قدرنا نفتح الكاميرا.';
 }
 
+function playBeep(ctx) {
+  try {
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 880;
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    oscillator.connect(gain);
+    gain.connect(ctx.destination);
+    oscillator.start();
+    oscillator.stop(ctx.currentTime + 0.15);
+  } catch {}
+}
+
 export default function AttendancePage() {
   const [groups, setGroups] = useState([]);
   const [groupId, setGroupId] = useState('');
@@ -36,6 +52,7 @@ export default function AttendancePage() {
   const scannerRef = useRef(null);
   const stopRequestedRef = useRef(false);
   const lastScanRef = useRef({ code: null, time: 0 });
+  const audioCtxRef = useRef(null);
 
   useEffect(() => {
     fetch('/api/groups', { cache: 'no-store' })
@@ -106,6 +123,7 @@ export default function AttendancePage() {
       if (!res.ok) {
         setFlash({ type: 'error', text: data.error || 'كود غير معروف' });
       } else {
+        if (audioCtxRef.current) playBeep(audioCtxRef.current);
         setFlash({ type: 'success', text: `تم تسجيل ${data.child.full_name} حاضر ✓` });
         loadRecords();
       }
@@ -129,6 +147,14 @@ export default function AttendancePage() {
       return;
     }
 
+    // Create the AudioContext synchronously inside the click handler so the
+    // browser ties it to the user gesture (needed for iOS Safari to allow
+    // playback later, from the async decode callback).
+    if (!audioCtxRef.current) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) audioCtxRef.current = new AudioCtx();
+    }
+
     stopRequestedRef.current = false;
     setStarting(true);
     // Reveal the scanner container first so html5-qrcode can measure it
@@ -139,7 +165,10 @@ export default function AttendancePage() {
     const instance = new Html5Qrcode('qr-reader');
     scannerRef.current = instance;
 
-    const config = { fps: 10, qrbox: 220 };
+    // aspectRatio: 1.0 keeps the video locked to a square, matching the
+    // fixed-size .scanner-box in CSS so the camera view never resizes
+    // based on unrelated page content (e.g. a growing roster list below).
+    const config = { fps: 10, qrbox: 220, aspectRatio: 1.0 };
     const onScanFailure = () => {};
 
     // Try the back camera first (ideal, not exact — degrades gracefully),
@@ -238,6 +267,10 @@ export default function AttendancePage() {
           .finally(() => {
             instance.clear().catch(() => {});
           });
+      }
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

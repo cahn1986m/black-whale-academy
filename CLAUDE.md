@@ -55,6 +55,8 @@ The children-list endpoint lives at **`/api/child-list`**, not `/api/children` �
 - Camera start tries, in order: exact back camera → ideal back camera → front camera → first device from `Html5Qrcode.getCameras()`. Failure at every step surfaces an Arabic message mapped from the `DOMException.name` (see `CAMERA_ERROR_MESSAGES`).
 - `stopRequestedRef` handles the race where the user hits "stop" while the camera is still negotiating permission; a `visibilitychange` listener auto-stops the camera when the tab is hidden. Any change to the start/stop lifecycle should preserve both.
 - Duplicate-scan protection is a 2.5s per-code cooldown (`SCAN_COOLDOWN_MS`, `lastScanRef`), separate from the DB-level UPSERT that prevents duplicate attendance rows.
+- Successful scans play a short beep via a Web Audio API `AudioContext` (`playBeep`), not an audio file. The context is created synchronously inside `startScanner`'s click handler (required for iOS Safari to allow playback later from the async decode callback) and is reused across start/stop cycles, closed only on unmount.
+- `.scanner-box` is a fixed `aspect-ratio: 1/1` square in `globals.css` (with `aspectRatio: 1.0` also passed to `html5-qrcode`'s config) specifically so the camera view never shrinks as the roster list below it grows — don't remove the fixed aspect ratio without another way to guarantee a stable camera size.
 
 ### `/api/reset`
 
