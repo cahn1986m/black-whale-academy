@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'force-no-store';
 
 export async function GET(request) {
   try {
@@ -21,8 +23,23 @@ export async function GET(request) {
           ORDER BY id ASC
         `;
 
-    return NextResponse.json({ children }, {
-      headers: { 'Cache-Control': 'no-store, max-age=0' },
+    return NextResponse.json({
+      children,
+      _meta: {
+        region: process.env.VERCEL_REGION || 'unknown',
+        deploymentId: process.env.VERCEL_DEPLOYMENT_ID || 'unknown',
+        gitCommit: process.env.VERCEL_GIT_COMMIT_SHA || 'unknown',
+        timestamp: new Date().toISOString(),
+        dbUrlHost: (process.env.DATABASE_URL || '').match(/@([^/]+)\//)?.[1] || 'unknown',
+      },
+    }, {
+      status: 200,
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0, s-maxage=0',
+        'Pragma': 'no-cache',
+        'CDN-Cache-Control': 'no-store',
+        'Vercel-CDN-Cache-Control': 'no-store',
+      },
     });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
