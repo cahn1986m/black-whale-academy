@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 
-export default function CopyRegisterLink() {
+export default function CopyLink({ path }) {
   const [url, setUrl] = useState('');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setUrl(`${window.location.origin}/register`);
-  }, []);
+    setUrl(`${window.location.origin}${path}`);
+  }, [path]);
 
   const copy = async () => {
     try {

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import CopyRegisterLink from './CopyRegisterLink';
+import CopyLink from './CopyLink';
 import Header from './Header';
 
 export default function HomePage() {
@@ -30,7 +30,14 @@ export default function HomePage() {
         <label style={{ fontSize: 13, color: 'var(--text-dim)', display: 'block', marginBottom: 8 }}>
           رابط التسجيل للأهل
         </label>
-        <CopyRegisterLink />
+        <CopyLink path="/register" />
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <label style={{ fontSize: 13, color: 'var(--text-dim)', display: 'block', marginBottom: 8 }}>
+          رابط تفقد الحضور للمدربين
+        </label>
+        <CopyLink path="/attendance" />
       </div>
     </div>
   );

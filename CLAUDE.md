@@ -94,10 +94,11 @@ Keep this updated whenever a file is added, removed, or renamed.
 ```
 app/
   layout.js                        root layout: <html lang="ar" dir="rtl">, page metadata
-  page.js                          home screen — nav tiles + CopyRegisterLink
+  page.js                          home screen — nav tiles + two CopyLink cards (register link for
+                                    parents, attendance link for coaches)
   globals.css                      all app styling (no CSS framework)
   Header.js                        shared page header (logo + title/subtitle)
-  CopyRegisterLink.js               "copy /register link" button on the home page
+  CopyLink.js                      generic "copy <path> link" button, parameterized by `path` prop
 
   register/page.js                 parent-facing registration form (multi-activity + package picker) → POST /api/register;
                                     no link back into the app; success screen has a PNG-download button
