@@ -33,8 +33,9 @@ Next.js 14 App Router app (JS, no TypeScript), Arabic RTL UI (`app/layout.js` se
 Six tables: `activities` (name/emoji/instructor/schedule — admin-managed, not hardcoded), `activity_packages` (session-count/price tiers per activity, e.g. "8 حصص / 300 درهم" and "12 حصة / 400 درهم" on the same activity), `children`, `enrollments` (many-to-many child↔activity join, `UNIQUE(child_id, activity_id)` — one row per child per activity, snapshotting `sessions_total`/`price_paid` at enroll time), `activity_attendance` (`UNIQUE(enrollment_id, attendance_date)`, keyed off the enrollment not the child, so the same child can have independent attendance rows for two different activities on the same day), and `admin_settings` (singleton row holding the `/admin` login password — see "Auth gate").
 
 Two derived-value rules that matter everywhere this data is read:
-- **`sessions_used`/`sessions_remaining` are never stored** — always `COUNT(*) FROM activity_attendance WHERE enrollment_id = X AND status = 'present'` vs `enrollments.sessions_total`. This avoids counter drift from the present/absent toggle button on the attendance roster. See the subquery pattern already used in `app/api/attendance/route.js` and `app/api/children/[id]/enrollments/route.js` — reuse it rather than inventing a stored counter.
-- **"Renew" is an UPSERT, not a new row** — `POST /api/children/[id]/enrollments` does `INSERT ... ON CONFLICT (child_id, activity_id) DO UPDATE SET sessions_total = enrollments.sessions_total + EXCLUDED.sessions_total, price_paid = ...`, so re-subscribing a child to an activity they're already in just adds to the existing enrollment instead of creating a duplicate.
+- **`sessions_used`/`sessions_remaining` are never stored as a mutable counter** — always `COUNT(*) FROM activity_attendance WHERE enrollment_id = X AND status = 'present'` **plus** `enrollments.sessions_used_offset`, vs `enrollments.sessions_total`. This avoids counter drift from the present/absent toggle button on the attendance roster. See the subquery pattern already used in `app/api/attendance/route.js` and `app/api/children/[id]/enrollments/route.js` — reuse it (and remember the `+ sessions_used_offset`) rather than inventing a separate stored counter.
+- **`sessions_used_offset`** exists specifically for clubs switching from paper/manual attendance to this app: it's an admin-editable starting count (`PATCH /api/children/[id]/enrollments`, `{ activityId, sessionsUsedOffset }` — the "تفقد يدوي" button on each enrollment row in `/admin`) representing sessions already attended *before* the app started tracking that child. It's added on top of real scanned attendance, not a replacement for it — scanning still increments the real count independently.
+- **"Renew" is an UPSERT, not a new row** — `POST /api/children/[id]/enrollments` does `INSERT ... ON CONFLICT (child_id, activity_id) DO UPDATE SET sessions_total = enrollments.sessions_total + EXCLUDED.sessions_total, price_paid = ...`, so re-subscribing a child to an activity they're already in just adds to the existing enrollment instead of creating a duplicate. This leaves `sessions_used_offset` untouched (it's not part of that UPDATE's column list).
 
 Marking attendance is always an `INSERT ... ON CONFLICT (enrollment_id, attendance_date) DO UPDATE` — never more than one attendance row per enrollment per day.
 
@@ -120,7 +121,9 @@ app/
   api/child-list/route.js          GET — full child roster, no filter (see "Route naming quirk")
   api/children/[id]/route.js       GET one child (full_name/photo/qr_token only)
   api/children/[id]/enrollments/route.js  GET this child's enrollments w/ derived sessions_used/remaining;
-                                    POST create-or-renew (UPSERT, see Database section); DELETE ?activityId= to unenroll
+                                    POST create-or-renew (UPSERT, see Database section);
+                                    PATCH {activityId, sessionsUsedOffset} to set pre-app manual attendance;
+                                    DELETE ?activityId= to unenroll
   api/attendance/route.js          GET roster for activityId+date (or all-activities view w/o activityId),
                                     POST mark attendance via {enrollmentId} or {qrToken, activityId}
   api/reset/route.js               POST — wipe all data (see "/api/reset" above)

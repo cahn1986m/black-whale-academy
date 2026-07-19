@@ -19,8 +19,8 @@ export async function GET(request) {
       ? await sql`
           SELECT e.id AS enrollment_id, c.id AS child_id, c.full_name, c.photo_base64,
             e.sessions_total,
-            COALESCE(u.used_count, 0) AS sessions_used,
-            e.sessions_total - COALESCE(u.used_count, 0) AS sessions_remaining,
+            COALESCE(u.used_count, 0) + e.sessions_used_offset AS sessions_used,
+            e.sessions_total - COALESCE(u.used_count, 0) - e.sessions_used_offset AS sessions_remaining,
             aa.status, aa.marked_at
           FROM enrollments e
           JOIN children c ON c.id = e.child_id
@@ -54,7 +54,7 @@ export async function GET(request) {
 
 async function getSessionsRemaining(enrollmentId) {
   const [row] = await sql`
-    SELECT e.sessions_total - COALESCE(u.used_count, 0) AS sessions_remaining
+    SELECT e.sessions_total - COALESCE(u.used_count, 0) - e.sessions_used_offset AS sessions_remaining
     FROM enrollments e
     LEFT JOIN (
       SELECT enrollment_id, COUNT(*)::int AS used_count

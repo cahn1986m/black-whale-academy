@@ -66,6 +66,8 @@ export default function AdminPage() {
   const [addEnrollPackageId, setAddEnrollPackageId] = useState('');
   const [renewingActivityId, setRenewingActivityId] = useState(null);
   const [renewPackageId, setRenewPackageId] = useState('');
+  const [editingOffsetActivityId, setEditingOffsetActivityId] = useState(null);
+  const [offsetDraft, setOffsetDraft] = useState('');
 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -254,6 +256,26 @@ export default function AdminPage() {
     setRenewPackageId('');
     loadEnrollments(childId);
     load();
+  };
+
+  const saveOffset = async (childId, activityId) => {
+    const sessionsUsedOffset = Number(offsetDraft);
+    if (Number.isNaN(sessionsUsedOffset) || sessionsUsedOffset < 0) {
+      alert('عدد الحصص غير صحيح');
+      return;
+    }
+    const res = await fetch(`/api/children/${childId}/enrollments`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activityId, sessionsUsedOffset }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert('صار خطأ: ' + data.error);
+      return;
+    }
+    setEditingOffsetActivityId(null);
+    loadEnrollments(childId);
   };
 
   const unenroll = async (childId, activityId) => {
@@ -581,6 +603,18 @@ export default function AdminPage() {
                       >
                         تجديد
                       </button>
+                      <button
+                        className="btn ghost"
+                        type="button"
+                        onClick={() => {
+                          const next = editingOffsetActivityId === e.activity_id ? null : e.activity_id;
+                          setEditingOffsetActivityId(next);
+                          setOffsetDraft(next ? String(e.sessions_used_offset) : '');
+                        }}
+                        style={{ width: 'auto', padding: '6px 10px', fontSize: 11, marginInlineStart: 6 }}
+                      >
+                        تفقد يدوي
+                      </button>
                       <button className="btn ghost" type="button" onClick={() => unenroll(c.id, e.activity_id)} style={{ width: 'auto', padding: '6px 10px', fontSize: 11, marginInlineStart: 6 }}>
                         إلغاء
                       </button>
@@ -605,6 +639,30 @@ export default function AdminPage() {
                         >
                           تأكيد
                         </button>
+                      </div>
+                    )}
+                    {editingOffsetActivityId === e.activity_id && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>
+                          عدد الحصص يلي حضرها الطفل يدوياً (تفقد ورقي) قبل استخدام النظام — بتنضاف على أي حصص متسجّلة عبر مسح QR
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input
+                            type="number"
+                            min="0"
+                            value={offsetDraft}
+                            onChange={(ev) => setOffsetDraft(ev.target.value)}
+                            style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                          />
+                          <button
+                            className="btn secondary"
+                            type="button"
+                            onClick={() => saveOffset(c.id, e.activity_id)}
+                            style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }}
+                          >
+                            حفظ
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

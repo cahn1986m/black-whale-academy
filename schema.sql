@@ -32,10 +32,18 @@ CREATE TABLE IF NOT EXISTS enrollments (
   activity_id INTEGER NOT NULL REFERENCES activities(id) ON DELETE CASCADE,
   package_id INTEGER REFERENCES activity_packages(id) ON DELETE SET NULL,
   sessions_total INTEGER NOT NULL,
+  -- Sessions already used before this child started being tracked by the
+  -- app (e.g. paper/manual attendance) — added on top of real scanned
+  -- attendance, editable by admin. See app/api/children/[id]/enrollments/route.js.
+  sessions_used_offset INTEGER NOT NULL DEFAULT 0,
   price_paid NUMERIC,
   enrolled_at TIMESTAMPTZ DEFAULT now(),
   UNIQUE(child_id, activity_id)
 );
+
+-- Safe to re-run on an already-existing database: adds the column if this
+-- table was created before sessions_used_offset existed.
+ALTER TABLE enrollments ADD COLUMN IF NOT EXISTS sessions_used_offset INTEGER NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS activity_attendance (
   id SERIAL PRIMARY KEY,

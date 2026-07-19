@@ -9,9 +9,9 @@ export async function GET(request, { params }) {
 
     const enrollments = await sql`
       SELECT e.id, e.activity_id, a.name AS activity_name, a.emoji,
-        e.sessions_total, e.price_paid,
-        COALESCE(u.used_count, 0) AS sessions_used,
-        e.sessions_total - COALESCE(u.used_count, 0) AS sessions_remaining
+        e.sessions_total, e.price_paid, e.sessions_used_offset,
+        COALESCE(u.used_count, 0) + e.sessions_used_offset AS sessions_used,
+        e.sessions_total - COALESCE(u.used_count, 0) - e.sessions_used_offset AS sessions_remaining
       FROM enrollments e
       JOIN activities a ON a.id = e.activity_id
       LEFT JOIN (
@@ -85,6 +85,36 @@ export async function POST(request, { params }) {
         price_paid = COALESCE(enrollments.price_paid, 0) + COALESCE(EXCLUDED.price_paid, 0)
       RETURNING id, child_id, activity_id, sessions_total, price_paid
     `;
+
+    return NextResponse.json({ enrollment });
+  } catch (err) {
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+export async function PATCH(request, { params }) {
+  try {
+    const childId = Number(params.id);
+    const body = await request.json().catch(() => ({}));
+    const activityId = Number(body.activityId);
+    const sessionsUsedOffset = Number(body.sessionsUsedOffset);
+
+    if (!activityId) {
+      return NextResponse.json({ error: 'النشاط مطلوب' }, { status: 400 });
+    }
+    if (Number.isNaN(sessionsUsedOffset) || sessionsUsedOffset < 0) {
+      return NextResponse.json({ error: 'عدد الحصص اليدوية غير صحيح' }, { status: 400 });
+    }
+
+    const [enrollment] = await sql`
+      UPDATE enrollments SET sessions_used_offset = ${sessionsUsedOffset}
+      WHERE child_id = ${childId} AND activity_id = ${activityId}
+      RETURNING id, child_id, activity_id, sessions_used_offset
+    `;
+
+    if (!enrollment) {
+      return NextResponse.json({ error: 'الاشتراك غير موجود' }, { status: 404 });
+    }
 
     return NextResponse.json({ enrollment });
   } catch (err) {
