@@ -287,13 +287,27 @@ export default function AdminPage() {
     }
   };
 
+  const logout = async () => {
+    await fetch('/api/admin-logout', { method: 'POST' });
+    window.location.href = '/';
+  };
+
   const enrolledActivityIds = new Set(childEnrollments.map((e) => e.activity_id));
   const availableForEnroll = activities.filter((a) => !enrolledActivityIds.has(a.id) && a.packages?.length > 0);
   const packagesForSelectedActivity = activities.find((a) => a.id === Number(addEnrollActivityId))?.packages || [];
 
   return (
     <div className="page">
-      <a href="/" className="back-link">← الرئيسية</a>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <a href="/" className="back-link" style={{ marginBottom: 0 }}>← الرئيسية</a>
+        <button
+          type="button"
+          onClick={logout}
+          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer', marginBottom: 14 }}
+        >
+          تسجيل الخروج ⏻
+        </button>
+      </div>
       <Header sub="إدارة الأنشطة والأطفال" />
 
       <button

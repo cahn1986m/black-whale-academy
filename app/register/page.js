@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import Header from '../Header';
 
@@ -45,6 +45,8 @@ export default function RegisterPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
+  const [downloading, setDownloading] = useState(false);
+  const badgeRef = useRef(null);
 
   useEffect(() => {
     fetch('/api/activities', { cache: 'no-store' })
@@ -124,21 +126,41 @@ export default function RegisterPage() {
     }
   };
 
+  const downloadBadge = async () => {
+    if (!badgeRef.current) return;
+    setDownloading(true);
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const canvas = await html2canvas(badgeRef.current, { backgroundColor: '#ffffff', scale: 2 });
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `qr-${result.full_name}.png`;
+      link.click();
+    } catch {
+      alert('ما قدرنا ننشئ الصورة، جرب مرة تانية');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   if (result) {
     return (
       <div className="page">
-        <a href="/" className="back-link">← الرئيسية</a>
         <Header sub="تم التسجيل بنجاح" />
         <div className="msg success">
           تم تسجيل {result.full_name} بنجاح ✓ — هاد الكود الخاص فيه، احتفظوا فيه أو صوروه، رح يُستخدم لتسجيل الحضور يومياً.
         </div>
-        <div className="badge-card">
+        <div className="badge-card" ref={badgeRef}>
           {photoPreview && <img src={photoPreview} alt={result.full_name} className="photo" />}
           <div style={{ fontWeight: 'bold', fontSize: 16 }}>{result.full_name}</div>
           <div className="qr-wrap">
             <QRCodeSVG value={result.qr_token} size={160} />
           </div>
+          <div style={{ fontSize: 12, color: '#666' }}>Black Whale Academy 🐋</div>
         </div>
+        <button className="btn secondary" type="button" onClick={downloadBadge} disabled={downloading} style={{ marginBottom: 10 }}>
+          {downloading ? 'جاري التحضير...' : '📥 تحميل صورة'}
+        </button>
         <a href="/register" className="btn secondary">تسجيل طفل تاني</a>
       </div>
     );
@@ -146,7 +168,6 @@ export default function RegisterPage() {
 
   return (
     <div className="page">
-      <a href="/" className="back-link">← الرئيسية</a>
       <Header sub="نموذج تسجيل طفل جديد" />
       {error && <div className="msg error">{error}</div>}
       <form onSubmit={submit}>

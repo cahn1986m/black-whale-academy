@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import Header from '../../../Header';
 
 export default function ChildBadgePage({ params }) {
   const [child, setChild] = useState(null);
   const [error, setError] = useState('');
+  const [downloading, setDownloading] = useState(false);
+  const badgeRef = useRef(null);
 
   useEffect(() => {
     fetch(`/api/children/${params.id}`, { cache: 'no-store' })
@@ -18,6 +20,23 @@ export default function ChildBadgePage({ params }) {
       .catch(() => setError('صار خطأ بالاتصال — تأكد من الإنترنت وحاول مرة تانية'));
   }, [params.id]);
 
+  const downloadBadge = async () => {
+    if (!badgeRef.current) return;
+    setDownloading(true);
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const canvas = await html2canvas(badgeRef.current, { backgroundColor: '#ffffff', scale: 2 });
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `qr-${child.full_name}.png`;
+      link.click();
+    } catch {
+      alert('ما قدرنا ننشئ الصورة، جرب مرة تانية');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   return (
     <div className="page">
       <a href="/admin" className="back-link">← الإدارة</a>
@@ -26,7 +45,7 @@ export default function ChildBadgePage({ params }) {
       {!child && !error && <div className="empty">جاري التحميل...</div>}
       {child && (
         <>
-          <div className="badge-card">
+          <div className="badge-card" ref={badgeRef}>
             {child.photo_base64 && <img src={child.photo_base64} alt={child.full_name} className="photo" />}
             <div style={{ fontWeight: 'bold', fontSize: 18 }}>{child.full_name}</div>
             <div className="qr-wrap">
@@ -34,7 +53,10 @@ export default function ChildBadgePage({ params }) {
             </div>
             <div style={{ fontSize: 12, color: '#666' }}>Black Whale Academy 🐋</div>
           </div>
-          <button className="btn secondary" onClick={() => window.print()} type="button">
+          <button className="btn secondary" onClick={downloadBadge} disabled={downloading} type="button">
+            {downloading ? 'جاري التحضير...' : '📥 تحميل صورة'}
+          </button>
+          <button className="btn secondary" onClick={() => window.print()} type="button" style={{ marginTop: 8 }}>
             🖨️ طباعة البطاقة
           </button>
         </>
