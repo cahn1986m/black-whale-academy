@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { sql } from '@/lib/db';
 
 const AUTH_COOKIE = 'bwa_admin_session';
 
@@ -9,11 +10,16 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     const password = typeof body.password === 'string' ? body.password : '';
 
-    if (!process.env.ADMIN_PASSWORD) {
-      return NextResponse.json({ error: 'كلمة المرور غير معدّة على السيرفر بعد' }, { status: 500 });
+    if (!password) {
+      return NextResponse.json({ error: 'كلمة المرور مطلوبة' }, { status: 400 });
     }
 
-    if (!password || password !== process.env.ADMIN_PASSWORD) {
+    const [row] = await sql`SELECT password FROM admin_settings WHERE id = 1`;
+    if (!row) {
+      return NextResponse.json({ error: 'ما في كلمة مرور معدّة على القاعدة بعد' }, { status: 500 });
+    }
+
+    if (password !== row.password) {
       return NextResponse.json({ error: 'كلمة المرور غير صحيحة' }, { status: 401 });
     }
 

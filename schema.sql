@@ -50,3 +50,17 @@ CREATE INDEX IF NOT EXISTS idx_activity_packages_activity ON activity_packages(a
 CREATE INDEX IF NOT EXISTS idx_enrollments_child ON enrollments(child_id);
 CREATE INDEX IF NOT EXISTS idx_enrollments_activity ON enrollments(activity_id);
 CREATE INDEX IF NOT EXISTS idx_activity_attendance_date ON activity_attendance(attendance_date);
+
+-- Single shared password for the /admin login gate. Changeable from inside
+-- /admin itself (no Vercel env var involved) — see app/api/admin-password/route.js.
+CREATE TABLE IF NOT EXISTS admin_settings (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  password TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  CONSTRAINT admin_settings_singleton CHECK (id = 1)
+);
+
+-- Default password after first running this file: admin123 — log into
+-- /admin with it once and change it immediately from the admin page.
+INSERT INTO admin_settings (id, password) VALUES (1, 'admin123')
+ON CONFLICT (id) DO NOTHING;

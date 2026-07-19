@@ -67,6 +67,13 @@ export default function AdminPage() {
   const [renewingActivityId, setRenewingActivityId] = useState(null);
   const [renewPackageId, setRenewPackageId] = useState('');
 
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
   const load = async () => {
     const [aRes, cRes] = await Promise.all([
       fetch('/api/activities', { cache: 'no-store' }),
@@ -292,6 +299,34 @@ export default function AdminPage() {
     window.location.href = '/';
   };
 
+  const changePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    if (newPassword !== confirmPassword) {
+      setPasswordError('كلمة المرور الجديدة وتأكيدها مش متطابقين');
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      const res = await fetch('/api/admin-password', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      alert('تم تغيير كلمة المرور بنجاح.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowPasswordForm(false);
+    } catch (err) {
+      setPasswordError(err.message);
+    } finally {
+      setSavingPassword(false);
+    }
+  };
+
   const enrolledActivityIds = new Set(childEnrollments.map((e) => e.activity_id));
   const availableForEnroll = activities.filter((a) => !enrolledActivityIds.has(a.id) && a.packages?.length > 0);
   const packagesForSelectedActivity = activities.find((a) => a.id === Number(addEnrollActivityId))?.packages || [];
@@ -300,14 +335,48 @@ export default function AdminPage() {
     <div className="page">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <a href="/" className="back-link" style={{ marginBottom: 0 }}>← الرئيسية</a>
-        <button
-          type="button"
-          onClick={logout}
-          style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer', marginBottom: 14 }}
-        >
-          تسجيل الخروج ⏻
-        </button>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+          <button
+            type="button"
+            onClick={() => setShowPasswordForm((v) => !v)}
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
+          >
+            🔑 تغيير كلمة المرور
+          </button>
+          <button
+            type="button"
+            onClick={logout}
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
+          >
+            تسجيل الخروج ⏻
+          </button>
+        </div>
       </div>
+
+      {showPasswordForm && (
+        <div className="card">
+          <div style={{ fontWeight: 'bold', marginBottom: 12 }}>تغيير كلمة المرور</div>
+          {passwordError && <div className="msg error">{passwordError}</div>}
+          <form onSubmit={changePassword}>
+            <div className="field">
+              <label>كلمة المرور الحالية</label>
+              <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>كلمة المرور الجديدة</label>
+              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>تأكيد كلمة المرور الجديدة</label>
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+            </div>
+            <button className="btn" type="submit" disabled={savingPassword}>
+              {savingPassword ? 'جاري الحفظ...' : 'حفظ كلمة المرور الجديدة'}
+            </button>
+          </form>
+        </div>
+      )}
+
       <Header sub="إدارة الأنشطة والأطفال" />
 
       <button
