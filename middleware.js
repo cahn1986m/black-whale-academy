@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
+import { verifyFreelancerSession } from '@/lib/freelancer-session';
 
 const AUTH_COOKIE = 'bwa_admin_session';
 const CACHE_TTL_MS = 30_000;
+const FREELANCER_AUTH_COOKIE = 'bwa_freelancer_session';
 
 let cachedPassword = null;
 let cachedAt = 0;
@@ -37,8 +39,35 @@ function isProtected(pathname, method) {
   return false;
 }
 
+function isFreelancerPath(pathname) {
+  return pathname.startsWith('/api/freelancer/') || pathname.startsWith('/freelancer/');
+}
+
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
+
+  if (isFreelancerPath(pathname)) {
+    // The login route is the gate itself — it must stay reachable
+    // while logged out, same reasoning as /api/admin-login above.
+    if (pathname === '/api/freelancer/login' || pathname === '/freelancer/login') {
+      return NextResponse.next();
+    }
+
+    const freelancerCookie = request.cookies.get(FREELANCER_AUTH_COOKIE)?.value;
+    const session = freelancerCookie ? await verifyFreelancerSession(freelancerCookie) : null;
+
+    if (session) {
+      return NextResponse.next();
+    }
+
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'يلزم تسجيل الدخول' }, { status: 401 });
+    }
+
+    const loginUrl = new URL('/freelancer/login', request.url);
+    loginUrl.searchParams.set('next', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
 
   if (!isProtected(pathname, request.method)) {
     return NextResponse.next();
@@ -62,5 +91,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/api/:path*'],
+  matcher: ['/admin/:path*', '/api/:path*', '/freelancer/:path*'],
 };

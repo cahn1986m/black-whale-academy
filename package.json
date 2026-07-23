@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
+    "bcryptjs": "^3.0.3",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
     "nanoid": "^5.0.7",
