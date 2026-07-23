@@ -58,6 +58,7 @@ export default function AdminPage() {
   const [seeding, setSeeding] = useState(false);
   const [error, setError] = useState('');
   const [resetting, setResetting] = useState(false);
+  const [resettingFreelancers, setResettingFreelancers] = useState(false);
 
   const [expandedChildId, setExpandedChildId] = useState(null);
   const [childEnrollments, setChildEnrollments] = useState([]);
@@ -313,6 +314,36 @@ export default function AdminPage() {
       alert('صار خطأ: ' + err.message);
     } finally {
       setResetting(false);
+    }
+  };
+
+  const resetFreelancerTestData = async () => {
+    const sure = window.confirm(
+      'هاد الإجراء رح يحذف نهائياً كل بيانات Freelancers التجريبية: المدربين، الجلسات، الحجوزات، الكشوفات المالية، والإشعارات — بدون رجعة.\n\nالأسعار الافتراضية والإعدادات العامة رح تضل موجودة.\n\nمتأكد بدك تكمل؟'
+    );
+    if (!sure) return;
+
+    const resetPassword = window.prompt('أدخل كلمة مرور تصفير بيانات Freelancers للتأكيد:');
+    if (resetPassword === null) return;
+    if (!resetPassword) {
+      alert('كلمة المرور مطلوبة. تم الإلغاء.');
+      return;
+    }
+
+    setResettingFreelancers(true);
+    try {
+      const res = await fetch('/api/admin/reset-freelancer-test-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resetPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      alert('تم تصفير بيانات Freelancers التجريبية بنجاح.');
+    } catch (err) {
+      alert('صار خطأ: ' + err.message);
+    } finally {
+      setResettingFreelancers(false);
     }
   };
 
@@ -709,6 +740,22 @@ export default function AdminPage() {
           )}
         </div>
       ))}
+
+      <div className="card" style={{ marginTop: 22, borderColor: 'var(--absent)' }}>
+        <div style={{ fontWeight: 'bold', marginBottom: 8, color: 'var(--absent)' }}>⚠️ منطقة خطر — Freelancers</div>
+        <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
+          يحذف نهائيًا كل بيانات وحدة Freelancers التجريبية (المدربين، الجلسات، الحجوزات، الكشوفات المالية، الإشعارات). الأسعار الافتراضية والإعدادات العامة ما بتتأثر.
+        </div>
+        <button
+          className="btn secondary"
+          type="button"
+          onClick={resetFreelancerTestData}
+          disabled={resettingFreelancers}
+          style={{ borderColor: 'var(--absent)', color: 'var(--absent)' }}
+        >
+          {resettingFreelancers ? 'جاري التصفير...' : 'تصفير بيانات Freelancers التجريبية'}
+        </button>
+      </div>
     </div>
   );
 }
