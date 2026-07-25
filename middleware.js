@@ -36,6 +36,7 @@ function isProtected(pathname, method) {
   if (pathname === '/api/admin-password') return true;
   if (pathname === '/api/reset') return true;
   if (pathname === '/api/admin/reset-freelancer-test-data') return true;
+  if (pathname.startsWith('/api/admin/')) return true;
   return false;
 }
 
