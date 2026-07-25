@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 import { verifyFreelancerSession } from '@/lib/freelancer-session';
+import { uaeSessionDateTimeToUtc } from '@/lib/uae-time';
 
 export const dynamic = 'force-dynamic';
 
-const UAE_UTC_OFFSET_HOURS = 4;
 const MAX_CHILD_COUNT = 200;
 
 export async function POST(request) {
@@ -36,14 +36,10 @@ export async function POST(request) {
     return NextResponse.json({ error: 'التاريخ والوقت مطلوبان' }, { status: 400 });
   }
 
-  // The input is treated explicitly as UAE local time (fixed UTC+4, no
-  // DST), regardless of what timezone the server itself runs in: parse
-  // as UTC first, then subtract the offset to get the real UTC instant.
-  const sessionDateTime = new Date(`${sessionDate}T${sessionTime}Z`);
-  if (Number.isNaN(sessionDateTime.getTime())) {
+  const sessionDateTime = uaeSessionDateTimeToUtc(sessionDate, sessionTime);
+  if (!sessionDateTime) {
     return NextResponse.json({ error: 'التاريخ أو الوقت غير صالح' }, { status: 400 });
   }
-  sessionDateTime.setUTCHours(sessionDateTime.getUTCHours() - UAE_UTC_OFFSET_HOURS);
 
   if (sessionDateTime.getTime() < Date.now()) {
     return NextResponse.json({ error: 'لا يمكن حجز موعد بالماضي' }, { status: 400 });
@@ -100,4 +96,38 @@ export async function POST(request) {
     console.error(err);
     return NextResponse.json({ error: 'حدث خطأ غير متوقع، حاول مرة أخرى' }, { status: 500 });
   }
+}
+
+export async function GET(request) {
+  const cookie = request.cookies.get('bwa_freelancer_session')?.value;
+  const session = cookie ? await verifyFreelancerSession(cookie) : null;
+
+  if (!session) {
+    return NextResponse.json({ error: 'يلزم تسجيل الدخول' }, { status: 401 });
+  }
+
+  const [freelancer] = await sql`SELECT is_active FROM freelancers WHERE id = ${session.freelancerId}`;
+
+  if (!freelancer || !freelancer.is_active) {
+    return NextResponse.json({ error: 'هذا الحساب معطّل، تواصل مع الإدارة' }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const statusFilter = searchParams.get('status');
+
+  const sessions = statusFilter
+    ? await sql`
+        SELECT id, session_date, session_time, status, closed_at, closed_by, rejected_at, rejection_reason, created_at
+        FROM freelancer_sessions
+        WHERE freelancer_id = ${session.freelancerId} AND status = ${statusFilter}
+        ORDER BY session_date DESC, session_time DESC
+      `
+    : await sql`
+        SELECT id, session_date, session_time, status, closed_at, closed_by, rejected_at, rejection_reason, created_at
+        FROM freelancer_sessions
+        WHERE freelancer_id = ${session.freelancerId}
+        ORDER BY session_date DESC, session_time DESC
+      `;
+
+  return NextResponse.json({ sessions });
 }
