@@ -1,0 +1,14 @@
+name: Close expired freelancer sessions
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch: {}
+jobs:
+  close-expired:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call close-expired endpoint
+        run: |
+          curl -sS -f -X GET \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://black-whale-academy-4yj1.vercel.app/api/cron/close-expired-freelancer-sessions
