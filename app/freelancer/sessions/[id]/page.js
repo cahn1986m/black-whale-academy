@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
 import Header from '../../../Header';
 
@@ -256,12 +255,6 @@ export default function FreelancerSessionDetailsPage({ params }) {
                 </div>
               ))}
             </>
-          )}
-
-          {canOperate && (
-            <Link href={`/freelancer/sessions/${sessionId}/scan`} className="btn" style={{ display: 'flex', marginTop: 8 }}>
-              📷 الانتقال للمسح
-            </Link>
           )}
 
           {canOperate && (
