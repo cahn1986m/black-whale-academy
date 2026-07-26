@@ -60,6 +60,11 @@ export default function AdminPage() {
   const [resetting, setResetting] = useState(false);
   const [resettingFreelancers, setResettingFreelancers] = useState(false);
 
+  const [pendingSessions, setPendingSessions] = useState([]);
+  const [loadingPendingSessions, setLoadingPendingSessions] = useState(true);
+  const [pendingSessionsError, setPendingSessionsError] = useState('');
+  const [processingSessionId, setProcessingSessionId] = useState(null);
+
   const [expandedChildId, setExpandedChildId] = useState(null);
   const [childEnrollments, setChildEnrollments] = useState([]);
   const [loadingEnrollments, setLoadingEnrollments] = useState(false);
@@ -92,6 +97,25 @@ export default function AdminPage() {
     load();
     const interval = setInterval(load, 15000);
     return () => clearInterval(interval);
+  }, []);
+
+  const loadPendingSessions = async () => {
+    setLoadingPendingSessions(true);
+    setPendingSessionsError('');
+    try {
+      const res = await fetch('/api/admin/freelancer-sessions?status=pending', { cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      setPendingSessions(data.sessions);
+    } catch (err) {
+      setPendingSessionsError(err.message);
+    } finally {
+      setLoadingPendingSessions(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPendingSessions();
   }, []);
 
   const addActivity = async (e) => {
@@ -344,6 +368,47 @@ export default function AdminPage() {
       alert('صار خطأ: ' + err.message);
     } finally {
       setResettingFreelancers(false);
+    }
+  };
+
+  const approveSession = async (sessionId) => {
+    setProcessingSessionId(sessionId);
+    try {
+      const res = await fetch(`/api/admin/freelancer-sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      setPendingSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    } catch (err) {
+      alert('صار خطأ: ' + err.message);
+    } finally {
+      setProcessingSessionId(null);
+    }
+  };
+
+  const rejectSession = async (sessionId) => {
+    const reason = window.prompt('اكتب سبب الرفض');
+    if (reason === null) return;
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) return;
+
+    setProcessingSessionId(sessionId);
+    try {
+      const res = await fetch(`/api/admin/freelancer-sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected', rejectionReason: trimmedReason }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      setPendingSessions((prev) => prev.filter((s) => s.id !== sessionId));
+    } catch (err) {
+      alert('صار خطأ: ' + err.message);
+    } finally {
+      setProcessingSessionId(null);
     }
   };
 
@@ -740,6 +805,48 @@ export default function AdminPage() {
           )}
         </div>
       ))}
+
+      <div className="card" style={{ marginTop: 22 }}>
+        <div style={{ fontWeight: 'bold', marginBottom: 12 }}>طلبات الفريلانسرز</div>
+
+        {pendingSessionsError && <div className="msg error">{pendingSessionsError}</div>}
+        {loadingPendingSessions && <div className="empty">جاري التحميل...</div>}
+        {!loadingPendingSessions && !pendingSessionsError && pendingSessions.length === 0 && (
+          <div className="empty">لا يوجد طلبات معلّقة حالياً</div>
+        )}
+
+        {!loadingPendingSessions && pendingSessions.map((s) => (
+          <div key={s.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ fontWeight: 'bold' }}>{s.freelancer_name}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
+              {new Date(s.session_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })} — {s.session_time.slice(0, 5)}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4, marginBottom: 8 }}>
+              تفاصيل الأعداد المطلوبة لكل مستوى غير متوفرة بهالعرض حالياً
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => approveSession(s.id)}
+                disabled={processingSessionId === s.id}
+                style={{ width: 'auto', padding: '8px 14px', fontSize: 13, borderColor: 'var(--present)', color: 'var(--present)' }}
+              >
+                موافقة
+              </button>
+              <button
+                type="button"
+                className="btn secondary"
+                onClick={() => rejectSession(s.id)}
+                disabled={processingSessionId === s.id}
+                style={{ width: 'auto', padding: '8px 14px', fontSize: 13, borderColor: 'var(--absent)', color: 'var(--absent)' }}
+              >
+                رفض
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
 
       <div className="card" style={{ marginTop: 22, borderColor: 'var(--absent)' }}>
         <div style={{ fontWeight: 'bold', marginBottom: 8, color: 'var(--absent)' }}>⚠️ منطقة خطر — Freelancers</div>
