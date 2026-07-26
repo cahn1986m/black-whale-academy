@@ -5,6 +5,7 @@ import { verifyFreelancerSession } from '@/lib/freelancer-session';
 const AUTH_COOKIE = 'bwa_admin_session';
 const CACHE_TTL_MS = 30_000;
 const FREELANCER_AUTH_COOKIE = 'bwa_freelancer_session';
+const STAFF_AUTH_COOKIE = 'bwa_staff_session';
 
 let cachedPassword = null;
 let cachedAt = 0;
@@ -44,6 +45,34 @@ function isFreelancerPath(pathname) {
   return pathname.startsWith('/api/freelancer/') || pathname.startsWith('/freelancer/');
 }
 
+let cachedStaffPassword = null;
+let cachedStaffAt = 0;
+
+async function getCurrentStaffPassword() {
+  const now = Date.now();
+  if (cachedStaffPassword !== null && now - cachedStaffAt < CACHE_TTL_MS) {
+    return cachedStaffPassword;
+  }
+  try {
+    const [row] = await sql`SELECT password FROM staff_settings WHERE id = 1`;
+    cachedStaffPassword = row?.password ?? null;
+    cachedStaffAt = now;
+  } catch {
+    // DB unreachable — don't cache a failure, just deny this request.
+    return null;
+  }
+  return cachedStaffPassword;
+}
+
+function isStaffProtected(pathname, method) {
+  if (pathname === '/api/staff-login' || pathname === '/api/staff-logout') return false;
+  if (pathname === '/staff/login') return false;
+  if (pathname === '/staff' || pathname.startsWith('/staff/')) return true;
+  if (pathname === '/attendance' || pathname.startsWith('/attendance/')) return true;
+  if (pathname === '/api/attendance') return method !== 'GET';
+  return false;
+}
+
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
@@ -70,6 +99,24 @@ export async function middleware(request) {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (isStaffProtected(pathname, request.method)) {
+    const staffCookie = request.cookies.get(STAFF_AUTH_COOKIE)?.value;
+    const currentStaffPassword = staffCookie ? await getCurrentStaffPassword() : null;
+    const staffAuthed = Boolean(staffCookie) && Boolean(currentStaffPassword) && staffCookie === currentStaffPassword;
+
+    if (staffAuthed) {
+      return NextResponse.next();
+    }
+
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'يلزم تسجيل الدخول' }, { status: 401 });
+    }
+
+    const staffLoginUrl = new URL('/staff/login', request.url);
+    staffLoginUrl.searchParams.set('next', pathname);
+    return NextResponse.redirect(staffLoginUrl);
+  }
+
   if (!isProtected(pathname, request.method)) {
     return NextResponse.next();
   }
@@ -92,5 +139,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/api/:path*', '/freelancer/:path*'],
+  matcher: ['/admin/:path*', '/api/:path*', '/freelancer/:path*', '/attendance/:path*', '/staff/:path*'],
 };

@@ -82,6 +82,11 @@ export default function AdminPage() {
   const [passwordError, setPasswordError] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
 
+  const [showStaffPasswordForm, setShowStaffPasswordForm] = useState(false);
+  const [staffNewPassword, setStaffNewPassword] = useState('');
+  const [staffPasswordError, setStaffPasswordError] = useState('');
+  const [savingStaffPassword, setSavingStaffPassword] = useState(false);
+
   const load = async () => {
     const [aRes, cRes] = await Promise.all([
       fetch('/api/activities', { cache: 'no-store' }),
@@ -445,6 +450,28 @@ export default function AdminPage() {
     }
   };
 
+  const changeStaffPassword = async (e) => {
+    e.preventDefault();
+    setStaffPasswordError('');
+    setSavingStaffPassword(true);
+    try {
+      const res = await fetch('/api/admin/staff-password', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword: staffNewPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      alert('تم تغيير كلمة مرور الموظف بنجاح.');
+      setStaffNewPassword('');
+      setShowStaffPasswordForm(false);
+    } catch (err) {
+      setStaffPasswordError(err.message);
+    } finally {
+      setSavingStaffPassword(false);
+    }
+  };
+
   const enrolledActivityIds = new Set(childEnrollments.map((e) => e.activity_id));
   const availableForEnroll = activities.filter((a) => !enrolledActivityIds.has(a.id) && a.packages?.length > 0);
   const packagesForSelectedActivity = activities.find((a) => a.id === Number(addEnrollActivityId))?.packages || [];
@@ -460,6 +487,13 @@ export default function AdminPage() {
             style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
           >
             🔑 تغيير كلمة المرور
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowStaffPasswordForm((v) => !v)}
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
+          >
+            🔑 كلمة مرور الموظف
           </button>
           <button
             type="button"
@@ -490,6 +524,22 @@ export default function AdminPage() {
             </div>
             <button className="btn" type="submit" disabled={savingPassword}>
               {savingPassword ? 'جاري الحفظ...' : 'حفظ كلمة المرور الجديدة'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {showStaffPasswordForm && (
+        <div className="card">
+          <div style={{ fontWeight: 'bold', marginBottom: 12 }}>كلمة مرور الموظف</div>
+          {staffPasswordError && <div className="msg error">{staffPasswordError}</div>}
+          <form onSubmit={changeStaffPassword}>
+            <div className="field">
+              <label>كلمة المرور الجديدة</label>
+              <input type="password" value={staffNewPassword} onChange={(e) => setStaffNewPassword(e.target.value)} />
+            </div>
+            <button className="btn" type="submit" disabled={savingStaffPassword}>
+              {savingStaffPassword ? 'جاري الحفظ...' : 'حفظ كلمة مرور الموظف'}
             </button>
           </form>
         </div>
