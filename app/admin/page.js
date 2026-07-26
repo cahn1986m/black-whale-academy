@@ -64,6 +64,7 @@ export default function AdminPage() {
   const [loadingPendingSessions, setLoadingPendingSessions] = useState(true);
   const [pendingSessionsError, setPendingSessionsError] = useState('');
   const [processingSessionId, setProcessingSessionId] = useState(null);
+  const [pendingSessionDetails, setPendingSessionDetails] = useState({});
 
   const [expandedChildId, setExpandedChildId] = useState(null);
   const [childEnrollments, setChildEnrollments] = useState([]);
@@ -112,6 +113,19 @@ export default function AdminPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'صار خطأ');
       setPendingSessions(data.sessions);
+
+      const detailEntries = await Promise.all(
+        data.sessions.map((s) =>
+          fetch(`/api/admin/freelancer-sessions/${s.id}`, { cache: 'no-store' })
+            .then(async (r) => {
+              const d = await r.json();
+              if (!r.ok) throw new Error(d.error || 'صار خطأ');
+              return [s.id, { levelCounts: d.levelCounts }];
+            })
+            .catch(() => [s.id, { error: true }])
+        )
+      );
+      setPendingSessionDetails(Object.fromEntries(detailEntries));
     } catch (err) {
       setPendingSessionsError(err.message);
     } finally {
@@ -876,7 +890,10 @@ export default function AdminPage() {
               {new Date(s.session_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })} — {s.session_time.slice(0, 5)}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4, marginBottom: 8 }}>
-              تفاصيل الأعداد المطلوبة لكل مستوى غير متوفرة بهالعرض حالياً
+              {pendingSessionDetails[s.id]?.error && 'ما قدرنا نجيب التفاصيل'}
+              {pendingSessionDetails[s.id]?.levelCounts?.map((lc) => (
+                <div key={lc.level}>{lc.level}: {lc.child_count} أطفال</div>
+              ))}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
