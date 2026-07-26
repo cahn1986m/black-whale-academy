@@ -48,6 +48,13 @@ const DEFAULT_ACTIVITIES = [
   },
 ];
 
+function getEffectivePrice(level, pricingOverrides, levelDefaultPricing) {
+  const override = pricingOverrides?.find((o) => o.level === level);
+  if (override) return Number(override.price);
+  const def = levelDefaultPricing.find((d) => d.level === level);
+  return def ? Number(def.price) : null;
+}
+
 export default function AdminPage() {
   const [activities, setActivities] = useState([]);
   const [children, setChildren] = useState([]);
@@ -65,6 +72,7 @@ export default function AdminPage() {
   const [pendingSessionsError, setPendingSessionsError] = useState('');
   const [processingSessionId, setProcessingSessionId] = useState(null);
   const [pendingSessionDetails, setPendingSessionDetails] = useState({});
+  const [levelDefaultPricing, setLevelDefaultPricing] = useState([]);
 
   const [expandedChildId, setExpandedChildId] = useState(null);
   const [childEnrollments, setChildEnrollments] = useState([]);
@@ -114,18 +122,27 @@ export default function AdminPage() {
       if (!res.ok) throw new Error(data.error || 'صار خطأ');
       setPendingSessions(data.sessions);
 
-      const detailEntries = await Promise.all(
-        data.sessions.map((s) =>
-          fetch(`/api/admin/freelancer-sessions/${s.id}`, { cache: 'no-store' })
-            .then(async (r) => {
-              const d = await r.json();
-              if (!r.ok) throw new Error(d.error || 'صار خطأ');
-              return [s.id, { levelCounts: d.levelCounts }];
-            })
-            .catch(() => [s.id, { error: true }])
-        )
-      );
+      const [detailEntries, levelPricingData] = await Promise.all([
+        Promise.all(
+          data.sessions.map((s) =>
+            Promise.all([
+              fetch(`/api/admin/freelancer-sessions/${s.id}`, { cache: 'no-store' }),
+              fetch(`/api/admin/freelancers/${s.freelancer_id}`, { cache: 'no-store' }),
+            ])
+              .then(async ([sessionRes, freelancerRes]) => {
+                const sessionData = await sessionRes.json();
+                const freelancerData = await freelancerRes.json();
+                if (!sessionRes.ok) throw new Error(sessionData.error || 'صار خطأ');
+                if (!freelancerRes.ok) throw new Error(freelancerData.error || 'صار خطأ');
+                return [s.id, { levelCounts: sessionData.levelCounts, pricingOverrides: freelancerData.pricingOverrides }];
+              })
+              .catch(() => [s.id, { error: true }])
+          )
+        ),
+        fetch('/api/admin/level-pricing', { cache: 'no-store' }).then((r) => r.json()),
+      ]);
       setPendingSessionDetails(Object.fromEntries(detailEntries));
+      setLevelDefaultPricing(levelPricingData.pricing || []);
     } catch (err) {
       setPendingSessionsError(err.message);
     } finally {
@@ -891,9 +908,37 @@ export default function AdminPage() {
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4, marginBottom: 8 }}>
               {pendingSessionDetails[s.id]?.error && 'ما قدرنا نجيب التفاصيل'}
-              {pendingSessionDetails[s.id]?.levelCounts?.map((lc) => (
-                <div key={lc.level}>{lc.level}: {lc.child_count} أطفال</div>
-              ))}
+              {pendingSessionDetails[s.id]?.levelCounts && (() => {
+                const detail = pendingSessionDetails[s.id];
+                let total = 0;
+                let incomplete = false;
+                const rows = detail.levelCounts.map((lc) => {
+                  const price = getEffectivePrice(lc.level, detail.pricingOverrides, levelDefaultPricing);
+                  if (price === null) {
+                    incomplete = true;
+                    return (
+                      <div key={lc.level} style={{ color: 'var(--absent)', fontWeight: 'bold' }}>
+                        {lc.level}: {lc.child_count} أطفال — ⚠️ ما في سعر مُعرّف لهالمستوى — الإغلاق رح يفشل
+                      </div>
+                    );
+                  }
+                  const subtotal = lc.child_count * price;
+                  total += subtotal;
+                  return (
+                    <div key={lc.level}>
+                      {lc.level}: {lc.child_count} أطفال × {price} درهم = {subtotal} درهم
+                    </div>
+                  );
+                });
+                return (
+                  <>
+                    {rows}
+                    <div style={{ fontWeight: 'bold', marginTop: 6, color: incomplete ? 'var(--absent)' : 'var(--text)' }}>
+                      {incomplete ? 'المجموع غير مكتمل، في مستوى بدون سعر' : `التكلفة المتوقعة الإجمالية: ${total} درهم`}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button
