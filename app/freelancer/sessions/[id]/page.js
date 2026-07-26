@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { QRCodeSVG } from 'qrcode.react';
 import Header from '../../../Header';
@@ -61,6 +61,19 @@ export default function FreelancerSessionDetailsPage({ params }) {
   const [error, setError] = useState('');
   const [generatingLevel, setGeneratingLevel] = useState(null);
   const [closing, setClosing] = useState(false);
+  const [downloadingTokenId, setDownloadingTokenId] = useState(null);
+  // One container per QR token, keyed by token.id — not a single shared
+  // ref — so downloading token B's image never accidentally captures
+  // token A's still-mounted container.
+  const qrContainerRefs = useRef(new Map());
+
+  const setQrContainerRef = (tokenId) => (el) => {
+    if (el) {
+      qrContainerRefs.current.set(tokenId, el);
+    } else {
+      qrContainerRefs.current.delete(tokenId);
+    }
+  };
 
   const loadSession = () => {
     setLoading(true);
@@ -107,6 +120,24 @@ export default function FreelancerSessionDetailsPage({ params }) {
       setError(err.message);
     } finally {
       setGeneratingLevel(null);
+    }
+  };
+
+  const downloadTokenImage = async (token) => {
+    const container = qrContainerRefs.current.get(token.id);
+    if (!container) return;
+    setDownloadingTokenId(token.id);
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const canvas = await html2canvas(container, { backgroundColor: '#ffffff', scale: 2 });
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `qr-freelancer-session-${sessionId}-${token.level}-${token.id}.png`;
+      link.click();
+    } catch {
+      alert('ما قدرنا ننشئ الصورة، جرب مرة تانية');
+    } finally {
+      setDownloadingTokenId(null);
     }
   };
 
@@ -204,9 +235,23 @@ export default function FreelancerSessionDetailsPage({ params }) {
                     </span>
                   </div>
                   {t.status === 'unused' && (
-                    <div style={{ display: 'flex', justifyContent: 'center' }}>
-                      <QRCodeSVG value={t.token} size={160} />
-                    </div>
+                    <>
+                      <div
+                        ref={setQrContainerRef(t.id)}
+                        style={{ display: 'flex', justifyContent: 'center', background: '#ffffff', padding: 12 }}
+                      >
+                        <QRCodeSVG value={t.token} size={160} />
+                      </div>
+                      <button
+                        className="btn secondary"
+                        type="button"
+                        onClick={() => downloadTokenImage(t)}
+                        disabled={downloadingTokenId === t.id}
+                        style={{ marginTop: 10 }}
+                      >
+                        {downloadingTokenId === t.id ? 'جاري التحضير...' : '📥 تحميل صورة'}
+                      </button>
+                    </>
                   )}
                 </div>
               ))}
