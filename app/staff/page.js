@@ -17,9 +17,9 @@ export default function StaffHomePage() {
         📋 تفقد الأكاديمية
       </Link>
 
-      <button className="btn secondary" type="button" disabled style={{ marginBottom: 12 }}>
-        🏊 تفقد الفريلانسرز (قريباً)
-      </button>
+      <Link href="/staff/freelancer-scan" className="btn secondary" style={{ display: 'flex', marginBottom: 12 }}>
+        🏊 تفقد الفريلانسرز
+      </Link>
 
       <button className="btn secondary" type="button" onClick={logout}>
         تسجيل الخروج

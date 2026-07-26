@@ -3,6 +3,38 @@ import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+export async function GET(request, { params }) {
+  const sessionId = Number(params.id);
+
+  const [session] = await sql`
+    SELECT
+      fs.id, fs.freelancer_id, f.name AS freelancer_name,
+      fs.session_date, fs.session_time, fs.status, fs.closed_at, fs.closed_by,
+      fs.rejected_at, fs.rejection_reason, fs.created_at
+    FROM freelancer_sessions fs
+    JOIN freelancers f ON f.id = fs.freelancer_id
+    WHERE fs.id = ${sessionId}
+  `;
+
+  if (!session) {
+    return NextResponse.json({ error: 'الجلسة غير موجودة' }, { status: 404 });
+  }
+
+  const levelCounts = await sql`
+    SELECT level, child_count
+    FROM freelancer_session_level_counts
+    WHERE session_id = ${sessionId}
+  `;
+
+  const qrTokens = await sql`
+    SELECT id, level, token, status, expires_at, scanned_at
+    FROM session_qr_tokens
+    WHERE session_id = ${sessionId}
+  `;
+
+  return NextResponse.json({ session, levelCounts, qrTokens });
+}
+
 export async function PATCH(request, { params }) {
   const sessionId = Number(params.id);
 

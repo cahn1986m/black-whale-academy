@@ -5,9 +5,12 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
-  const statusFilter = searchParams.get('status');
+  const statusParam = searchParams.get('status');
+  const statusArray = statusParam
+    ? statusParam.split(',').map((s) => s.trim()).filter(Boolean)
+    : null;
 
-  const sessions = statusFilter
+  const sessions = statusArray && statusArray.length > 0
     ? await sql`
         SELECT
           fs.id, fs.freelancer_id, f.name AS freelancer_name, f.phone AS freelancer_phone,
@@ -15,7 +18,7 @@ export async function GET(request) {
           fs.rejected_at, fs.rejection_reason, fs.created_at
         FROM freelancer_sessions fs
         JOIN freelancers f ON f.id = fs.freelancer_id
-        WHERE fs.status = ${statusFilter}
+        WHERE fs.status = ANY(${statusArray})
         ORDER BY fs.session_date DESC, fs.session_time DESC
       `
     : await sql`
