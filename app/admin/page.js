@@ -856,7 +856,11 @@ export default function AdminPage() {
         </div>
       ))}
 
-      <div className="card" style={{ marginTop: 22 }}>
+      <a href="/admin/freelancers" className="btn" style={{ display: 'flex', marginTop: 22 }}>
+        👥 إدارة المدربين
+      </a>
+
+      <div className="card" style={{ marginTop: 14 }}>
         <div style={{ fontWeight: 'bold', marginBottom: 12 }}>طلبات الفريلانسرز</div>
 
         {pendingSessionsError && <div className="msg error">{pendingSessionsError}</div>}
