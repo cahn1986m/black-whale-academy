@@ -888,7 +888,7 @@ export default function AdminPage() {
       ))}
 
       <a href="/admin/freelancers" className="btn" style={{ display: 'flex', marginTop: 22 }}>
-        👥 إدارة المدربين
+        🏊 إدارة الفريلانسرز
       </a>
 
       <div className="card" style={{ marginTop: 14 }}>
