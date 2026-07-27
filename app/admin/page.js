@@ -891,6 +891,10 @@ export default function AdminPage() {
         🏊 إدارة الفريلانسرز
       </a>
 
+      <a href="/admin/instructors" className="btn" style={{ display: 'flex', marginTop: 12 }}>
+        👥 إدارة المدربين
+      </a>
+
       <div className="card" style={{ marginTop: 14 }}>
         <div style={{ fontWeight: 'bold', marginBottom: 12 }}>طلبات الفريلانسرز</div>
 
