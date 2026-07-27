@@ -35,9 +35,16 @@ export default function HomePage() {
 
       <div className="card" style={{ marginTop: 12 }}>
         <label style={{ fontSize: 13, color: 'var(--text-dim)', display: 'block', marginBottom: 8 }}>
-          رابط تفقد الحضور للمدربين
+          رابط دخول الموظفين
         </label>
-        <CopyLink path="/attendance" />
+        <CopyLink path="/staff" />
+      </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <label style={{ fontSize: 13, color: 'var(--text-dim)', display: 'block', marginBottom: 8 }}>
+          رابط الدخول للمدربين المستقلين
+        </label>
+        <CopyLink path="/freelancer/login" />
       </div>
     </div>
   );
