@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Header from '../Header';
+import Header from '../../Header';
 
 export default function StaffHomePage() {
   const logout = async () => {

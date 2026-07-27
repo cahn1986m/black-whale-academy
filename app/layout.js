@@ -1,4 +1,11 @@
+import { Cairo } from 'next/font/google';
 import './globals.css';
+
+const cairo = Cairo({
+  subsets: ['arabic', 'latin'],
+  weight: ['400', '700', '900'],
+  variable: '--font-cairo',
+});
 
 export const metadata = {
   title: 'الحوت الأسود | تفقد الحضور',
@@ -13,7 +20,7 @@ export const viewport = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" className={cairo.variable}>
       <body>
         <div className="bg-decor" aria-hidden="true">
           <span>🏊</span>
