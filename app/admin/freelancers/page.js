@@ -11,6 +11,13 @@ const PAYMENT_TYPE_LABELS = {
   on_account: 'على الحساب',
 };
 
+const ENTRY_TYPE_LABELS = {
+  payment: 'دفعة',
+  session_charge: 'تحصيل جلسة',
+  no_show_fee: 'غرامة غياب',
+  reversal: 'عكس حركة',
+};
+
 function isLocked(lockedUntil) {
   return Boolean(lockedUntil) && new Date(lockedUntil).getTime() > Date.now();
 }
@@ -29,6 +36,14 @@ export default function AdminFreelancersPage() {
   const [freelancerDetail, setFreelancerDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [overrideDraft, setOverrideDraft] = useState({});
+  const [freelancerLedger, setFreelancerLedger] = useState(null);
+
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentDirection, setPaymentDirection] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentFormError, setPaymentFormError] = useState('');
 
   const [levelPriceDraft, setLevelPriceDraft] = useState({});
 
@@ -107,10 +122,16 @@ export default function AdminFreelancersPage() {
   const loadFreelancerDetail = async (freelancerId) => {
     setLoadingDetail(true);
     try {
-      const res = await fetch(`/api/admin/freelancers/${freelancerId}`, { cache: 'no-store' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
-      setFreelancerDetail({ freelancer: data.freelancer, pricingOverrides: data.pricingOverrides });
+      const [detailRes, ledgerRes] = await Promise.all([
+        fetch(`/api/admin/freelancers/${freelancerId}`, { cache: 'no-store' }),
+        fetch(`/api/admin/freelancers/${freelancerId}/ledger`, { cache: 'no-store' }),
+      ]);
+      const detailData = await detailRes.json();
+      const ledgerData = await ledgerRes.json();
+      if (!detailRes.ok) throw new Error(detailData.error || 'صار خطأ');
+      if (!ledgerRes.ok) throw new Error(ledgerData.error || 'صار خطأ');
+      setFreelancerDetail({ freelancer: detailData.freelancer, pricingOverrides: detailData.pricingOverrides });
+      setFreelancerLedger({ entries: ledgerData.entries, currentBalance: ledgerData.currentBalance });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -118,16 +139,104 @@ export default function AdminFreelancersPage() {
     }
   };
 
+  const loadLedger = async (freelancerId) => {
+    try {
+      const res = await fetch(`/api/admin/freelancers/${freelancerId}/ledger`, { cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      setFreelancerLedger({ entries: data.entries, currentBalance: data.currentBalance });
+      setFreelancers((prev) =>
+        prev.map((f) => (f.id === freelancerId ? { ...f, current_balance: data.currentBalance } : f))
+      );
+      setFreelancerDetail((prev) =>
+        prev && prev.freelancer.id === freelancerId
+          ? { ...prev, freelancer: { ...prev.freelancer, current_balance: data.currentBalance } }
+          : prev
+      );
+    } catch (err) {
+      alert('صار خطأ: ' + err.message);
+    }
+  };
+
   const toggleExpandFreelancer = (freelancerId) => {
     if (expandedFreelancerId === freelancerId) {
       setExpandedFreelancerId(null);
       setFreelancerDetail(null);
+      setFreelancerLedger(null);
       return;
     }
     setExpandedFreelancerId(freelancerId);
     setFreelancerDetail(null);
+    setFreelancerLedger(null);
     setOverrideDraft({});
+    setShowPaymentForm(false);
+    setPaymentDirection('');
+    setPaymentAmount('');
+    setPaymentNote('');
+    setPaymentFormError('');
     loadFreelancerDetail(freelancerId);
+  };
+
+  const reverseEntry = async (freelancerId, entry) => {
+    const reason = window.prompt('اكتب سبب عكس هالحركة');
+    if (reason === null) return;
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) return;
+    try {
+      const res = await fetch(`/api/admin/freelancers/${freelancerId}/ledger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entryType: 'reversal',
+          amount: -1 * Number(entry.amount),
+          note: trimmedReason,
+          reversedEntryId: entry.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      loadLedger(freelancerId);
+    } catch (err) {
+      alert('صار خطأ: ' + err.message);
+    }
+  };
+
+  const savePayment = async (freelancerId) => {
+    setPaymentFormError('');
+    if (paymentDirection !== 'in' && paymentDirection !== 'out') {
+      setPaymentFormError('اختر اتجاه الحركة');
+      return;
+    }
+    const amountValue = Number(paymentAmount);
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      setPaymentFormError('المبلغ يجب أن يكون رقماً موجباً');
+      return;
+    }
+    const trimmedNote = paymentNote.trim();
+    if (!trimmedNote) {
+      setPaymentFormError('الملاحظة مطلوبة');
+      return;
+    }
+    const signedAmount = paymentDirection === 'in' ? amountValue : -amountValue;
+    setSavingPayment(true);
+    try {
+      const res = await fetch(`/api/admin/freelancers/${freelancerId}/ledger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryType: 'payment', amount: signedAmount, note: trimmedNote }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      setPaymentDirection('');
+      setPaymentAmount('');
+      setPaymentNote('');
+      setShowPaymentForm(false);
+      loadLedger(freelancerId);
+    } catch (err) {
+      setPaymentFormError(err.message);
+    } finally {
+      setSavingPayment(false);
+    }
   };
 
   const toggleActive = async (freelancer) => {
@@ -416,6 +525,119 @@ export default function AdminFreelancersPage() {
                         </div>
                       );
                     })}
+
+                    <div style={{ fontWeight: 'bold', margin: '18px 0 8px' }}>السجل المالي</div>
+
+                    <button
+                      className="btn secondary"
+                      type="button"
+                      onClick={() => setShowPaymentForm((v) => !v)}
+                      style={{ marginBottom: 12 }}
+                    >
+                      ➕ تسجيل دفعة
+                    </button>
+
+                    {showPaymentForm && (
+                      <div className="card">
+                        {paymentFormError && <div className="msg error">{paymentFormError}</div>}
+                        <div className="field">
+                          <label>الاتجاه</label>
+                          <select
+                            value={paymentDirection}
+                            onChange={(e) => setPaymentDirection(e.target.value)}
+                          >
+                            <option value="">اختر الاتجاه</option>
+                            <option value="in">دفعة واردة من المدرب (تزيد رصيده)</option>
+                            <option value="out">دفعة صادرة له / تصحيح (تنقص رصيده)</option>
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label>المبلغ</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={paymentAmount}
+                            onChange={(e) => setPaymentAmount(e.target.value)}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="field">
+                          <label>الملاحظة</label>
+                          <input
+                            type="text"
+                            value={paymentNote}
+                            onChange={(e) => setPaymentNote(e.target.value)}
+                            placeholder="سبب الدفعة"
+                          />
+                        </div>
+                        <button
+                          className="btn"
+                          type="button"
+                          onClick={() => savePayment(freelancerDetail.freelancer.id)}
+                          disabled={savingPayment}
+                        >
+                          {savingPayment ? 'جاري الحفظ...' : 'حفظ'}
+                        </button>
+                      </div>
+                    )}
+
+                    {!freelancerLedger && <div className="empty">جاري التحميل...</div>}
+                    {freelancerLedger && freelancerLedger.entries.length === 0 && (
+                      <div className="empty">ما في حركات بعد</div>
+                    )}
+                    {freelancerLedger && freelancerLedger.entries.length > 0 && (() => {
+                      const reversedIds = new Set(
+                        freelancerLedger.entries
+                          .filter((e) => e.reversed_entry_id != null)
+                          .map((e) => e.reversed_entry_id)
+                      );
+                      return freelancerLedger.entries.map((entry) => (
+                        <div className="card" key={entry.id}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                              <div style={{ fontWeight: 'bold' }}>{ENTRY_TYPE_LABELS[entry.entry_type] || entry.entry_type}</div>
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                                {new Date(entry.created_at).toLocaleString('ar-EG', {
+                                  day: 'numeric',
+                                  month: 'long',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </div>
+                            </div>
+                            <div
+                              style={{
+                                fontWeight: 'bold',
+                                fontSize: 16,
+                                color: Number(entry.amount) < 0 ? 'var(--absent)' : 'var(--present)',
+                              }}
+                            >
+                              {Number(entry.amount).toFixed(2)}
+                            </div>
+                          </div>
+
+                          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
+                            الرصيد بعد الحركة: {Number(entry.balance_after).toFixed(2)}
+                          </div>
+
+                          {entry.note && (
+                            <div style={{ fontSize: 13, marginTop: 8 }}>{entry.note}</div>
+                          )}
+
+                          {!reversedIds.has(entry.id) && (
+                            <button
+                              className="btn ghost"
+                              type="button"
+                              onClick={() => reverseEntry(freelancerDetail.freelancer.id, entry)}
+                              style={{ width: 'auto', padding: '6px 10px', fontSize: 12, marginTop: 8 }}
+                            >
+                              عكس
+                            </button>
+                          )}
+                        </div>
+                      ));
+                    })()}
                   </>
                 )}
               </div>

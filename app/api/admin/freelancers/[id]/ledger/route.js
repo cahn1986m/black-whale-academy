@@ -3,6 +3,26 @@ import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+export async function GET(request, { params }) {
+  const freelancerId = Number(params.id);
+
+  const entries = await sql`
+    SELECT id, entry_type, amount, balance_after, note, related_session_id, reversed_entry_id, created_at
+    FROM freelancer_ledger_entries
+    WHERE freelancer_id = ${freelancerId}
+    ORDER BY id DESC
+  `;
+
+  const [balanceRow] = await sql`
+    SELECT current_balance FROM freelancer_balances WHERE freelancer_id = ${freelancerId}
+  `;
+
+  return NextResponse.json({
+    entries,
+    currentBalance: balanceRow?.current_balance ?? 0,
+  });
+}
+
 export async function POST(request, { params }) {
   const freelancerId = Number(params.id);
 
