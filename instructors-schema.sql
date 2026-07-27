@@ -7,10 +7,7 @@
 -- the academy for teaching its own activities; freelancers rent pool
 -- time and pay the academy — opposite financial direction, see the
 -- sign-convention note on instructor_ledger_entries below).
--- Review only. Do NOT run this until approved.
---
--- Run once in the Neon SQL Editor (same process as schema.sql), after
--- review.
+-- Executed and live on production DB as of 2026-07-27.
 --
 -- IMPORTANT — the record_instructor_attendance() correction/idempotency
 -- logic below (how it behaves when called twice, or when correcting a
