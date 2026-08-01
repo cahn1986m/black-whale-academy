@@ -21,6 +21,10 @@ export default function StaffHomePage() {
         🏊 تفقد الفريلانسرز
       </Link>
 
+      <Link href="/staff/instructor-attendance" className="btn secondary" style={{ display: 'flex', marginBottom: 12 }}>
+        🧑‍🏫 حضور مدربي الأنشطة
+      </Link>
+
       <button className="btn secondary" type="button" onClick={logout}>
         تسجيل الخروج
       </button>
