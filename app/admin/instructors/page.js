@@ -8,7 +8,14 @@ export default function AdminInstructorsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [instructorForm, setInstructorForm] = useState({ name: '', contact: '', default_rate_per_session: '' });
+  const [instructorForm, setInstructorForm] = useState({
+    name: '',
+    contact: '',
+    pay_type: 'per_session',
+    default_rate_per_day: '',
+    monthly_salary: '',
+    monthly_absence_deduction: '',
+  });
   const [savingInstructor, setSavingInstructor] = useState(false);
   const [instructorFormError, setInstructorFormError] = useState('');
 
@@ -16,8 +23,16 @@ export default function AdminInstructorsPage() {
   const [instructorDetail, setInstructorDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
-  const [editForm, setEditForm] = useState({ name: '', contact: '', default_rate_per_session: '' });
+  const [editForm, setEditForm] = useState({
+    name: '',
+    contact: '',
+    pay_type: 'per_session',
+    default_rate_per_day: '',
+    monthly_salary: '',
+    monthly_absence_deduction: '',
+  });
   const [savingEdit, setSavingEdit] = useState(false);
+  const [issuingSalary, setIssuingSalary] = useState(false);
 
   const loadAll = async () => {
     setLoading(true);
@@ -43,15 +58,35 @@ export default function AdminInstructorsPage() {
     setInstructorFormError('');
     const name = instructorForm.name.trim();
     const contact = instructorForm.contact.trim();
-    const defaultRatePerSession = Number(instructorForm.default_rate_per_session);
+    const payType = instructorForm.pay_type;
 
     if (!name) {
       setInstructorFormError('اسم المدرب مطلوب');
       return;
     }
-    if (!Number.isFinite(defaultRatePerSession) || defaultRatePerSession <= 0) {
-      setInstructorFormError('سعر الحصة لازم يكون رقم أكبر من صفر');
-      return;
+
+    const body = { name, contact, pay_type: payType };
+
+    if (payType === 'per_session') {
+      const defaultRatePerDay = Number(instructorForm.default_rate_per_day);
+      if (!Number.isFinite(defaultRatePerDay) || defaultRatePerDay <= 0) {
+        setInstructorFormError('سعر الحصة لازم يكون رقم أكبر من صفر');
+        return;
+      }
+      body.default_rate_per_day = defaultRatePerDay;
+    } else {
+      const monthlySalary = Number(instructorForm.monthly_salary);
+      if (!Number.isFinite(monthlySalary) || monthlySalary <= 0) {
+        setInstructorFormError('الراتب الشهري لازم يكون رقم أكبر من صفر');
+        return;
+      }
+      const monthlyAbsenceDeduction = Number(instructorForm.monthly_absence_deduction);
+      if (!Number.isFinite(monthlyAbsenceDeduction) || monthlyAbsenceDeduction <= 0) {
+        setInstructorFormError('مبلغ خصم الغياب لازم يكون رقم أكبر من صفر');
+        return;
+      }
+      body.monthly_salary = monthlySalary;
+      body.monthly_absence_deduction = monthlyAbsenceDeduction;
     }
 
     setSavingInstructor(true);
@@ -59,7 +94,7 @@ export default function AdminInstructorsPage() {
       const res = await fetch('/api/admin/instructors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, contact, default_rate_per_session: defaultRatePerSession }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'صار خطأ');
@@ -70,13 +105,23 @@ export default function AdminInstructorsPage() {
             id: data.instructorId,
             name,
             contact,
-            default_rate_per_session: defaultRatePerSession,
+            pay_type: payType,
+            default_rate_per_day: payType === 'per_session' ? body.default_rate_per_day : null,
+            monthly_salary: payType === 'monthly' ? body.monthly_salary : null,
+            monthly_absence_deduction: payType === 'monthly' ? body.monthly_absence_deduction : null,
             active: true,
             current_balance: 0,
           },
         ].sort((a, b) => a.name.localeCompare(b.name))
       );
-      setInstructorForm({ name: '', contact: '', default_rate_per_session: '' });
+      setInstructorForm({
+        name: '',
+        contact: '',
+        pay_type: 'per_session',
+        default_rate_per_day: '',
+        monthly_salary: '',
+        monthly_absence_deduction: '',
+      });
     } catch (err) {
       setInstructorFormError(err.message);
     } finally {
@@ -94,7 +139,10 @@ export default function AdminInstructorsPage() {
       setEditForm({
         name: data.instructor.name,
         contact: data.instructor.contact || '',
-        default_rate_per_session: data.instructor.default_rate_per_session,
+        pay_type: data.instructor.pay_type,
+        default_rate_per_day: data.instructor.default_rate_per_day ?? '',
+        monthly_salary: data.instructor.monthly_salary ?? '',
+        monthly_absence_deduction: data.instructor.monthly_absence_deduction ?? '',
       });
     } catch (err) {
       setError(err.message);
@@ -138,15 +186,35 @@ export default function AdminInstructorsPage() {
   const saveEdit = async (instructorId) => {
     const name = editForm.name.trim();
     const contact = editForm.contact.trim();
-    const defaultRatePerSession = Number(editForm.default_rate_per_session);
+    const payType = editForm.pay_type;
 
     if (!name) {
       alert('اسم المدرب مطلوب');
       return;
     }
-    if (!Number.isFinite(defaultRatePerSession) || defaultRatePerSession <= 0) {
-      alert('سعر الحصة لازم يكون رقم أكبر من صفر');
-      return;
+
+    const body = { name, contact, pay_type: payType };
+
+    if (payType === 'per_session') {
+      const defaultRatePerDay = Number(editForm.default_rate_per_day);
+      if (!Number.isFinite(defaultRatePerDay) || defaultRatePerDay <= 0) {
+        alert('سعر الحصة لازم يكون رقم أكبر من صفر');
+        return;
+      }
+      body.default_rate_per_day = defaultRatePerDay;
+    } else {
+      const monthlySalary = Number(editForm.monthly_salary);
+      if (!Number.isFinite(monthlySalary) || monthlySalary <= 0) {
+        alert('الراتب الشهري لازم يكون رقم أكبر من صفر');
+        return;
+      }
+      const monthlyAbsenceDeduction = Number(editForm.monthly_absence_deduction);
+      if (!Number.isFinite(monthlyAbsenceDeduction) || monthlyAbsenceDeduction <= 0) {
+        alert('مبلغ خصم الغياب لازم يكون رقم أكبر من صفر');
+        return;
+      }
+      body.monthly_salary = monthlySalary;
+      body.monthly_absence_deduction = monthlyAbsenceDeduction;
     }
 
     setSavingEdit(true);
@@ -154,26 +222,47 @@ export default function AdminInstructorsPage() {
       const res = await fetch(`/api/admin/instructors/${instructorId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, contact, default_rate_per_session: defaultRatePerSession }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      const updatedFields = {
+        name,
+        contact,
+        pay_type: payType,
+        default_rate_per_day: payType === 'per_session' ? body.default_rate_per_day : null,
+        monthly_salary: payType === 'monthly' ? body.monthly_salary : null,
+        monthly_absence_deduction: payType === 'monthly' ? body.monthly_absence_deduction : null,
+      };
       setInstructors((prev) =>
         prev
-          .map((i) =>
-            i.id === instructorId ? { ...i, name, contact, default_rate_per_session: defaultRatePerSession } : i
-          )
+          .map((i) => (i.id === instructorId ? { ...i, ...updatedFields } : i))
           .sort((a, b) => a.name.localeCompare(b.name))
       );
       setInstructorDetail((prev) =>
         prev && prev.instructor.id === instructorId
-          ? { ...prev, instructor: { ...prev.instructor, name, contact, default_rate_per_session: defaultRatePerSession } }
+          ? { ...prev, instructor: { ...prev.instructor, ...updatedFields } }
           : prev
       );
     } catch (err) {
       alert('صار خطأ: ' + err.message);
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const issueSalary = async (instructorId) => {
+    setIssuingSalary(true);
+    try {
+      const res = await fetch(`/api/admin/instructors/${instructorId}/issue-salary`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      alert('تم إصدار الراتب بنجاح');
+      loadInstructorDetail(instructorId);
+    } catch (err) {
+      alert('صار خطأ: ' + err.message);
+    } finally {
+      setIssuingSalary(false);
     }
   };
 
@@ -206,15 +295,50 @@ export default function AdminInstructorsPage() {
             />
           </div>
           <div className="field">
-            <label>سعر الحصة</label>
-            <input
-              type="number"
-              min="0"
-              value={instructorForm.default_rate_per_session}
-              onChange={(e) => setInstructorForm((f) => ({ ...f, default_rate_per_session: e.target.value }))}
-              placeholder="0.00"
-            />
+            <label>نوع الدفع</label>
+            <select
+              value={instructorForm.pay_type}
+              onChange={(e) => setInstructorForm((f) => ({ ...f, pay_type: e.target.value }))}
+            >
+              <option value="per_session">بالحصة اليومية</option>
+              <option value="monthly">راتب شهري</option>
+            </select>
           </div>
+          {instructorForm.pay_type === 'per_session' ? (
+            <div className="field">
+              <label>سعر الحصة اليومية</label>
+              <input
+                type="number"
+                min="0"
+                value={instructorForm.default_rate_per_day}
+                onChange={(e) => setInstructorForm((f) => ({ ...f, default_rate_per_day: e.target.value }))}
+                placeholder="0.00"
+              />
+            </div>
+          ) : (
+            <>
+              <div className="field">
+                <label>الراتب الشهري</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={instructorForm.monthly_salary}
+                  onChange={(e) => setInstructorForm((f) => ({ ...f, monthly_salary: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="field">
+                <label>مبلغ خصم الغياب اليومي</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={instructorForm.monthly_absence_deduction}
+                  onChange={(e) => setInstructorForm((f) => ({ ...f, monthly_absence_deduction: e.target.value }))}
+                  placeholder="0.00"
+                />
+              </div>
+            </>
+          )}
           <button className="btn" type="submit" disabled={savingInstructor}>
             {savingInstructor ? 'جاري الإضافة...' : 'إضافة المدرب'}
           </button>
@@ -236,6 +360,9 @@ export default function AdminInstructorsPage() {
                 style={{ marginInlineEnd: 8 }}
               >
                 {i.active ? 'نشط' : 'معطّل'}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--text-dim)', marginInlineEnd: 8 }}>
+                {i.pay_type === 'monthly' ? 'شهري' : 'بالحصة'}
               </span>
               <span style={{ fontWeight: 'bold', color: Number(i.current_balance) < 0 ? 'var(--absent)' : 'var(--text)' }}>
                 {Number(i.current_balance).toFixed(2)}
@@ -277,14 +404,47 @@ export default function AdminInstructorsPage() {
                       />
                     </div>
                     <div className="field">
-                      <label>سعر الحصة</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={editForm.default_rate_per_session}
-                        onChange={(e) => setEditForm((f) => ({ ...f, default_rate_per_session: e.target.value }))}
-                      />
+                      <label>نوع الدفع</label>
+                      <select
+                        value={editForm.pay_type}
+                        onChange={(e) => setEditForm((f) => ({ ...f, pay_type: e.target.value }))}
+                      >
+                        <option value="per_session">بالحصة اليومية</option>
+                        <option value="monthly">راتب شهري</option>
+                      </select>
                     </div>
+                    {editForm.pay_type === 'per_session' ? (
+                      <div className="field">
+                        <label>سعر الحصة اليومية</label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={editForm.default_rate_per_day}
+                          onChange={(e) => setEditForm((f) => ({ ...f, default_rate_per_day: e.target.value }))}
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <div className="field">
+                          <label>الراتب الشهري</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editForm.monthly_salary}
+                            onChange={(e) => setEditForm((f) => ({ ...f, monthly_salary: e.target.value }))}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>مبلغ خصم الغياب اليومي</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={editForm.monthly_absence_deduction}
+                            onChange={(e) => setEditForm((f) => ({ ...f, monthly_absence_deduction: e.target.value }))}
+                          />
+                        </div>
+                      </>
+                    )}
                     <button
                       className="btn secondary"
                       type="button"
@@ -293,6 +453,18 @@ export default function AdminInstructorsPage() {
                     >
                       {savingEdit ? 'جاري الحفظ...' : 'حفظ'}
                     </button>
+
+                    {instructorDetail.instructor.pay_type === 'monthly' && (
+                      <button
+                        className="btn secondary"
+                        type="button"
+                        onClick={() => issueSalary(instructorDetail.instructor.id)}
+                        disabled={issuingSalary}
+                        style={{ marginTop: 8 }}
+                      >
+                        {issuingSalary ? 'جاري الإصدار...' : 'إصدار راتب هذا الشهر'}
+                      </button>
+                    )}
 
                     <div style={{ fontWeight: 'bold', margin: '18px 0 8px' }}>الأنشطة المرتبطة</div>
                     {instructorDetail.linkedActivities.length === 0 ? (
