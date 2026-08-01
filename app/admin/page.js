@@ -58,6 +58,7 @@ function getEffectivePrice(level, pricingOverrides, levelDefaultPricing) {
 export default function AdminPage() {
   const [activities, setActivities] = useState([]);
   const [children, setChildren] = useState([]);
+  const [instructors, setInstructors] = useState([]);
   const [activityForm, setActivityForm] = useState({ name: '', emoji: '', instructorName: '', scheduleText: '' });
   const [packageDraft, setPackageDraft] = useState({}); // { [activityId]: { sessionCount, price } }
   const [savingActivity, setSavingActivity] = useState(false);
@@ -97,14 +98,17 @@ export default function AdminPage() {
   const [savingStaffPassword, setSavingStaffPassword] = useState(false);
 
   const load = async () => {
-    const [aRes, cRes] = await Promise.all([
+    const [aRes, cRes, iRes] = await Promise.all([
       fetch('/api/activities', { cache: 'no-store' }),
       fetch('/api/child-list', { cache: 'no-store' }),
+      fetch('/api/admin/instructors', { cache: 'no-store' }),
     ]);
     const aData = await aRes.json();
     const cData = await cRes.json();
+    const iData = await iRes.json();
     setActivities(aData.activities || []);
     setChildren(cData.children || []);
+    setInstructors(iData.instructors || []);
   };
 
   useEffect(() => {
@@ -225,6 +229,21 @@ export default function AdminPage() {
     }
     load();
     if (expandedChildId) loadEnrollments(expandedChildId);
+  };
+
+  const updateActivityInstructor = async (activityId, instructorId) => {
+    try {
+      const res = await fetch(`/api/activities/${activityId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instructorId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      setActivities((prev) => prev.map((a) => (a.id === activityId ? { ...a, instructor_id: instructorId } : a)));
+    } catch (err) {
+      alert('صار خطأ: ' + err.message);
+    }
   };
 
   const updatePackageDraft = (activityId, field, value) => {
@@ -657,9 +676,17 @@ export default function AdminPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontWeight: 'bold' }}>{a.emoji ? `${a.emoji} ` : ''}{a.name}</div>
-              <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                {a.instructor_name || 'بدون مدرب محدد'} — {a.enrolled_count} مشترك
-              </div>
+              <select
+                value={a.instructor_id || ''}
+                onChange={(e) => updateActivityInstructor(a.id, e.target.value ? Number(e.target.value) : null)}
+                style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+              >
+                <option value="">بدون مدرب محدد</option>
+                {instructors.filter((i) => i.active).map((i) => (
+                  <option key={i.id} value={i.id}>{i.name}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{a.enrolled_count} مشترك</div>
               {a.schedule_text && (
                 <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{a.schedule_text}</div>
               )}

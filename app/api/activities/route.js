@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   try {
     const activities = await sql`
-      SELECT a.id, a.name, a.emoji, a.instructor_name, a.schedule_text,
+      SELECT a.id, a.name, a.emoji, a.instructor_name, a.instructor_id, a.schedule_text,
         COUNT(DISTINCT e.child_id)::int AS enrolled_count
       FROM activities a
       LEFT JOIN enrollments e ON e.activity_id = a.id

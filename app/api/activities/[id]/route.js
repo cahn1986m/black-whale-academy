@@ -12,7 +12,7 @@ export async function PATCH(request, { params }) {
       return NextResponse.json({ error: 'اسم النشاط مطلوب' }, { status: 400 });
     }
 
-    if (body.name === undefined && body.emoji === undefined && body.instructorName === undefined && body.scheduleText === undefined) {
+    if (body.name === undefined && body.emoji === undefined && body.instructorName === undefined && body.scheduleText === undefined && body.instructorId === undefined) {
       return NextResponse.json({ error: 'ما في شي للتحديث' }, { status: 400 });
     }
 
@@ -21,9 +21,10 @@ export async function PATCH(request, { params }) {
         name = COALESCE(${body.name !== undefined ? body.name.trim() : null}, name),
         emoji = CASE WHEN ${body.emoji !== undefined} THEN ${body.emoji || null} ELSE emoji END,
         instructor_name = CASE WHEN ${body.instructorName !== undefined} THEN ${body.instructorName || null} ELSE instructor_name END,
+        instructor_id = CASE WHEN ${body.instructorId !== undefined} THEN ${body.instructorId} ELSE instructor_id END,
         schedule_text = CASE WHEN ${body.scheduleText !== undefined} THEN ${body.scheduleText || null} ELSE schedule_text END
       WHERE id = ${id}
-      RETURNING id, name, emoji, instructor_name, schedule_text
+      RETURNING id, name, emoji, instructor_name, instructor_id, schedule_text
     `;
 
     if (!activity) {
