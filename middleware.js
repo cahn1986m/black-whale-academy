@@ -70,6 +70,19 @@ function isStaffProtected(pathname, method) {
   if (pathname === '/staff' || pathname.startsWith('/staff/')) return true;
   if (pathname === '/attendance' || pathname.startsWith('/attendance/')) return true;
   if (pathname === '/api/attendance') return method !== 'GET';
+  if (pathname.startsWith('/api/staff/')) return true;
+  return false;
+}
+
+// These two exact route+method combos are used by BOTH the admin
+// approval panel (level-count/cost breakdown display) AND the staff
+// scan page — so they must accept either a valid staff cookie or a
+// valid admin cookie. Everything else under
+// /api/admin/freelancer-sessions/* (the list, and PATCH for
+// approve/reject) stays admin-cookie-only, unchanged.
+function isDualAuthRoute(pathname, method) {
+  if (/^\/api\/admin\/freelancer-sessions\/\d+$/.test(pathname) && method === 'GET') return true;
+  if (/^\/api\/admin\/freelancer-sessions\/\d+\/scan$/.test(pathname) && method === 'POST') return true;
   return false;
 }
 
@@ -97,6 +110,22 @@ export async function middleware(request) {
     const loginUrl = new URL('/freelancer/login', request.url);
     loginUrl.searchParams.set('next', pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  if (isDualAuthRoute(pathname, request.method)) {
+    const staffCookie = request.cookies.get(STAFF_AUTH_COOKIE)?.value;
+    const currentStaffPassword = staffCookie ? await getCurrentStaffPassword() : null;
+    const staffAuthed = Boolean(staffCookie) && Boolean(currentStaffPassword) && staffCookie === currentStaffPassword;
+
+    if (staffAuthed) return NextResponse.next();
+
+    const adminCookie = request.cookies.get(AUTH_COOKIE)?.value;
+    const currentAdminPassword = adminCookie ? await getCurrentPassword() : null;
+    const adminAuthed = Boolean(adminCookie) && Boolean(currentAdminPassword) && adminCookie === currentAdminPassword;
+
+    if (adminAuthed) return NextResponse.next();
+
+    return NextResponse.json({ error: 'يلزم تسجيل الدخول' }, { status: 401 });
   }
 
   if (isStaffProtected(pathname, request.method)) {
