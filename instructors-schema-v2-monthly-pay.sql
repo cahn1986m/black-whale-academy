@@ -4,7 +4,7 @@
 -- instructors-schema.sql (already live). Safe against the 4 real rows
 -- currently in `instructors` and the 0 rows in instructor_attendance /
 -- instructor_ledger_entries (verified via information_schema before
--- writing this). Review only. Do NOT run until approved.
+-- writing this). Executed and live on production DB as of 2026-08-01.
 
 -- ============================================================
 -- 1. instructors — rename rate column, add pay_type + monthly fields
