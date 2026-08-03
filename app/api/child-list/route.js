@@ -8,7 +8,13 @@ export const fetchCache = 'force-no-store';
 export async function GET() {
   try {
     const children = await sql`
-      SELECT id, full_name, parent_contact, photo_base64, qr_token
+      SELECT
+        id, full_name, photo_base64, qr_token,
+        date_of_birth, nationality, gender,
+        parent_full_name, relationship_to_child, parent_phone, parent_email, address,
+        has_medical_condition, medical_condition_details,
+        is_on_medication, medication_details,
+        consent_terms_accepted, consent_marketing_photos
       FROM children
       ORDER BY id ASC
     `;

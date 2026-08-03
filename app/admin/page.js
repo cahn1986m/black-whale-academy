@@ -55,6 +55,49 @@ function getEffectivePrice(level, pricingOverrides, levelDefaultPricing) {
   return def ? Number(def.price) : null;
 }
 
+// Fields that are required for new registrations but stay nullable at the DB
+// level for legacy trainees (see schema.sql migration notes). Any of these
+// being null on a real trainee row must surface as a visible "missing data"
+// badge — never silently treated as "no"/empty, especially for the medical
+// fields.
+const REQUIRED_NULLABLE_FIELDS = [
+  'date_of_birth', 'nationality', 'gender',
+  'parent_full_name', 'relationship_to_child', 'parent_email',
+  'has_medical_condition', 'is_on_medication', 'consent_terms_accepted',
+];
+
+function hasMissingData(c) {
+  return REQUIRED_NULLABLE_FIELDS.some((f) => c[f] === null || c[f] === undefined || c[f] === '');
+}
+
+function formatDate(d) {
+  if (!d) return null;
+  return new Date(d).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function genderLabel(g) {
+  if (g === 'male') return 'ذكر';
+  if (g === 'female') return 'أنثى';
+  return null;
+}
+
+function BoolBadge({ value }) {
+  if (value === true) return <span className="status-pill present">نعم</span>;
+  if (value === false) return <span className="status-pill absent">لا</span>;
+  return (
+    <span className="status-pill" style={{ background: 'rgba(234,179,8,0.18)', color: '#b45309' }}>
+      ⚠️ لم يُسأل بعد
+    </span>
+  );
+}
+
+function MissingField({ value, children }) {
+  if (value === null || value === undefined || value === '') {
+    return <span style={{ color: '#b45309' }}>⚠️ بيانات ناقصة</span>;
+  }
+  return children;
+}
+
 export default function AdminPage() {
   const [activities, setActivities] = useState([]);
   const [children, setChildren] = useState([]);
@@ -84,6 +127,11 @@ export default function AdminPage() {
   const [renewPackageId, setRenewPackageId] = useState('');
   const [editingOffsetActivityId, setEditingOffsetActivityId] = useState(null);
   const [offsetDraft, setOffsetDraft] = useState('');
+
+  const [editingInfoChildId, setEditingInfoChildId] = useState(null);
+  const [infoDraft, setInfoDraft] = useState(null);
+  const [savingInfo, setSavingInfo] = useState(false);
+  const [infoError, setInfoError] = useState('');
 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -356,6 +404,53 @@ export default function AdminPage() {
     }
     setEditingOffsetActivityId(null);
     loadEnrollments(childId);
+  };
+
+  const startEditInfo = (c) => {
+    setInfoError('');
+    setEditingInfoChildId(c.id);
+    setInfoDraft({
+      fullName: c.full_name || '',
+      dateOfBirth: c.date_of_birth ? c.date_of_birth.slice(0, 10) : '',
+      nationality: c.nationality || '',
+      gender: c.gender || '',
+      parentFullName: c.parent_full_name || '',
+      relationshipToChild: c.relationship_to_child || '',
+      parentPhone: c.parent_phone || '',
+      parentEmail: c.parent_email || '',
+      address: c.address || '',
+      hasMedicalCondition: c.has_medical_condition,
+      medicalConditionDetails: c.medical_condition_details || '',
+      isOnMedication: c.is_on_medication,
+      medicationDetails: c.medication_details || '',
+    });
+  };
+
+  const cancelEditInfo = () => {
+    setEditingInfoChildId(null);
+    setInfoDraft(null);
+    setInfoError('');
+  };
+
+  const saveInfo = async (childId) => {
+    setInfoError('');
+    setSavingInfo(true);
+    try {
+      const res = await fetch(`/api/children/${childId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(infoDraft),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      setEditingInfoChildId(null);
+      setInfoDraft(null);
+      load();
+    } catch (err) {
+      setInfoError(err.message);
+    } finally {
+      setSavingInfo(false);
+    }
   };
 
   const unenroll = async (childId, activityId) => {
@@ -761,6 +856,14 @@ export default function AdminPage() {
               <div className="child-avatar-fallback">🧒</div>
             )}
             <span className="name">{c.full_name}</span>
+            {hasMissingData(c) && (
+              <span
+                className="status-pill"
+                style={{ background: 'rgba(234,179,8,0.18)', color: '#b45309', marginInlineStart: 8 }}
+              >
+                ⚠️ بيانات ناقصة
+              </span>
+            )}
             <a
               href={`/admin/child/${c.id}`}
               onClick={(e) => e.stopPropagation()}
@@ -773,6 +876,172 @@ export default function AdminPage() {
 
           {expandedChildId === c.id && (
             <div className="card" style={{ marginTop: -4 }}>
+              <div style={{ paddingBottom: 12, marginBottom: 12, borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{ fontWeight: 'bold' }}>بيانات المتدرب</div>
+                  {editingInfoChildId !== c.id && (
+                    <button
+                      className="btn ghost"
+                      type="button"
+                      onClick={() => startEditInfo(c)}
+                      style={{ width: 'auto', padding: '6px 10px', fontSize: 11 }}
+                    >
+                      تعديل البيانات
+                    </button>
+                  )}
+                </div>
+
+                {editingInfoChildId === c.id ? (
+                  <div>
+                    {infoError && <div className="msg error">{infoError}</div>}
+                    <div className="field">
+                      <label>اسم المتدرب الكامل</label>
+                      <input type="text" value={infoDraft.fullName} onChange={(e) => setInfoDraft((d) => ({ ...d, fullName: e.target.value }))} />
+                    </div>
+                    <div className="field">
+                      <label>تاريخ الميلاد</label>
+                      <input type="date" value={infoDraft.dateOfBirth} onChange={(e) => setInfoDraft((d) => ({ ...d, dateOfBirth: e.target.value }))} />
+                    </div>
+                    <div className="field">
+                      <label>الجنسية</label>
+                      <input type="text" value={infoDraft.nationality} onChange={(e) => setInfoDraft((d) => ({ ...d, nationality: e.target.value }))} />
+                    </div>
+                    <div className="field">
+                      <label>الجنس</label>
+                      <select value={infoDraft.gender} onChange={(e) => setInfoDraft((d) => ({ ...d, gender: e.target.value }))}>
+                        <option value="">اختر</option>
+                        <option value="male">ذكر</option>
+                        <option value="female">أنثى</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label>اسم ولي الأمر الكامل</label>
+                      <input type="text" value={infoDraft.parentFullName} onChange={(e) => setInfoDraft((d) => ({ ...d, parentFullName: e.target.value }))} />
+                    </div>
+                    <div className="field">
+                      <label>صلة القرابة</label>
+                      <input type="text" value={infoDraft.relationshipToChild} onChange={(e) => setInfoDraft((d) => ({ ...d, relationshipToChild: e.target.value }))} />
+                    </div>
+                    <div className="field">
+                      <label>رقم تواصل ولي الأمر</label>
+                      <input type="tel" value={infoDraft.parentPhone} onChange={(e) => setInfoDraft((d) => ({ ...d, parentPhone: e.target.value }))} />
+                    </div>
+                    <div className="field">
+                      <label>البريد الإلكتروني</label>
+                      <input type="email" value={infoDraft.parentEmail} onChange={(e) => setInfoDraft((d) => ({ ...d, parentEmail: e.target.value }))} />
+                    </div>
+                    <div className="field">
+                      <label>العنوان (اختياري)</label>
+                      <input type="text" value={infoDraft.address} onChange={(e) => setInfoDraft((d) => ({ ...d, address: e.target.value }))} />
+                    </div>
+
+                    <div className="field">
+                      <label>هل عند المتدرب حالة صحية يجب الانتباه لها؟</label>
+                      <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            type="radio"
+                            name={`hasMedicalCondition-${c.id}`}
+                            checked={infoDraft.hasMedicalCondition === true}
+                            onChange={() => setInfoDraft((d) => ({ ...d, hasMedicalCondition: true }))}
+                          />
+                          نعم
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            type="radio"
+                            name={`hasMedicalCondition-${c.id}`}
+                            checked={infoDraft.hasMedicalCondition === false}
+                            onChange={() => setInfoDraft((d) => ({ ...d, hasMedicalCondition: false, medicalConditionDetails: '' }))}
+                          />
+                          لا
+                        </label>
+                      </div>
+                    </div>
+                    {infoDraft.hasMedicalCondition === true && (
+                      <div className="field">
+                        <label>تفاصيل الحالة الصحية</label>
+                        <input
+                          type="text"
+                          value={infoDraft.medicalConditionDetails}
+                          onChange={(e) => setInfoDraft((d) => ({ ...d, medicalConditionDetails: e.target.value }))}
+                        />
+                      </div>
+                    )}
+
+                    <div className="field">
+                      <label>هل يتناول المتدرب أدوية بشكل منتظم؟</label>
+                      <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            type="radio"
+                            name={`isOnMedication-${c.id}`}
+                            checked={infoDraft.isOnMedication === true}
+                            onChange={() => setInfoDraft((d) => ({ ...d, isOnMedication: true }))}
+                          />
+                          نعم
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            type="radio"
+                            name={`isOnMedication-${c.id}`}
+                            checked={infoDraft.isOnMedication === false}
+                            onChange={() => setInfoDraft((d) => ({ ...d, isOnMedication: false, medicationDetails: '' }))}
+                          />
+                          لا
+                        </label>
+                      </div>
+                    </div>
+                    {infoDraft.isOnMedication === true && (
+                      <div className="field">
+                        <label>تفاصيل الأدوية</label>
+                        <input
+                          type="text"
+                          value={infoDraft.medicationDetails}
+                          onChange={(e) => setInfoDraft((d) => ({ ...d, medicationDetails: e.target.value }))}
+                        />
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                      <button className="btn secondary" type="button" onClick={cancelEditInfo} style={{ flex: 1 }}>إلغاء</button>
+                      <button className="btn" type="button" onClick={() => saveInfo(c.id)} disabled={savingInfo} style={{ flex: 1 }}>
+                        {savingInfo ? 'جاري الحفظ...' : 'حفظ'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div>تاريخ الميلاد: <MissingField value={c.date_of_birth}>{formatDate(c.date_of_birth)}</MissingField></div>
+                    <div>الجنسية: <MissingField value={c.nationality}>{c.nationality}</MissingField></div>
+                    <div>الجنس: <MissingField value={c.gender}>{genderLabel(c.gender)}</MissingField></div>
+                    <div>ولي الأمر: <MissingField value={c.parent_full_name}>{c.parent_full_name}</MissingField></div>
+                    <div>صلة القرابة: <MissingField value={c.relationship_to_child}>{c.relationship_to_child}</MissingField></div>
+                    <div>هاتف ولي الأمر: {c.parent_phone}</div>
+                    <div>البريد الإلكتروني: <MissingField value={c.parent_email}>{c.parent_email}</MissingField></div>
+                    <div>العنوان: {c.address || '—'}</div>
+                    <div style={{ marginTop: 4, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span>حالة صحية؟</span> <BoolBadge value={c.has_medical_condition} />
+                      </div>
+                      {c.has_medical_condition && <div style={{ color: 'var(--text-dim)' }}>{c.medical_condition_details}</div>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, marginBottom: 4 }}>
+                        <span>يتناول أدوية؟</span> <BoolBadge value={c.is_on_medication} />
+                      </div>
+                      {c.is_on_medication && <div style={{ color: 'var(--text-dim)' }}>{c.medication_details}</div>}
+                    </div>
+                    <div style={{ marginTop: 4, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span>موافقة الشروط والأحكام؟</span> <BoolBadge value={c.consent_terms_accepted} />
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span>موافقة استخدام الصور تسويقياً؟</span> <BoolBadge value={c.consent_marketing_photos} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {loadingEnrollments && <div className="empty">جاري التحميل...</div>}
               {!loadingEnrollments && childEnrollments.length === 0 && (
                 <div className="empty">ما في اشتراكات بأنشطة بعد</div>
