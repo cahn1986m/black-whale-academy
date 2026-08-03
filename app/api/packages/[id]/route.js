@@ -8,12 +8,15 @@ export async function PATCH(request, { params }) {
     const id = Number(params.id);
     const body = await request.json().catch(() => ({}));
 
-    if (body.sessionCount === undefined && body.price === undefined) {
+    if (body.sessionCount === undefined && body.price === undefined && body.sessionsPerWeek === undefined) {
       return NextResponse.json({ error: 'ما في شي للتحديث' }, { status: 400 });
     }
 
     const sessionCount = body.sessionCount !== undefined ? Number(body.sessionCount) : null;
     const price = body.price !== undefined ? Number(body.price) : null;
+    const sessionsPerWeek = body.sessionsPerWeek !== undefined && body.sessionsPerWeek !== null && body.sessionsPerWeek !== ''
+      ? Number(body.sessionsPerWeek)
+      : null;
 
     if (body.sessionCount !== undefined && (!sessionCount || sessionCount <= 0)) {
       return NextResponse.json({ error: 'عدد الحصص غير صحيح' }, { status: 400 });
@@ -21,13 +24,17 @@ export async function PATCH(request, { params }) {
     if (body.price !== undefined && (Number.isNaN(price) || price < 0)) {
       return NextResponse.json({ error: 'السعر غير صحيح' }, { status: 400 });
     }
+    if (body.sessionsPerWeek !== undefined && sessionsPerWeek !== null && (Number.isNaN(sessionsPerWeek) || sessionsPerWeek <= 0)) {
+      return NextResponse.json({ error: 'عدد الحصص الأسبوعية غير صحيح' }, { status: 400 });
+    }
 
     const [pkg] = await sql`
       UPDATE activity_packages SET
         session_count = COALESCE(${sessionCount}, session_count),
-        price = COALESCE(${price}, price)
+        price = COALESCE(${price}, price),
+        sessions_per_week = CASE WHEN ${body.sessionsPerWeek !== undefined} THEN ${sessionsPerWeek} ELSE sessions_per_week END
       WHERE id = ${id}
-      RETURNING id, activity_id, session_count, price
+      RETURNING id, activity_id, session_count, price, sessions_per_week
     `;
 
     if (!pkg) {

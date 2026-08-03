@@ -9,12 +9,18 @@ export async function POST(request, { params }) {
     const body = await request.json().catch(() => ({}));
     const sessionCount = Number(body.sessionCount);
     const price = Number(body.price);
+    const sessionsPerWeek = body.sessionsPerWeek !== undefined && body.sessionsPerWeek !== null && body.sessionsPerWeek !== ''
+      ? Number(body.sessionsPerWeek)
+      : null;
 
     if (!sessionCount || sessionCount <= 0) {
       return NextResponse.json({ error: 'عدد الحصص مطلوب' }, { status: 400 });
     }
     if (price === undefined || price === null || Number.isNaN(price) || price < 0) {
       return NextResponse.json({ error: 'السعر مطلوب' }, { status: 400 });
+    }
+    if (sessionsPerWeek !== null && (Number.isNaN(sessionsPerWeek) || sessionsPerWeek <= 0)) {
+      return NextResponse.json({ error: 'عدد الحصص الأسبوعية غير صحيح' }, { status: 400 });
     }
 
     const [activity] = await sql`SELECT id FROM activities WHERE id = ${activityId}`;
@@ -23,9 +29,9 @@ export async function POST(request, { params }) {
     }
 
     const [pkg] = await sql`
-      INSERT INTO activity_packages (activity_id, session_count, price)
-      VALUES (${activityId}, ${sessionCount}, ${price})
-      RETURNING id, activity_id, session_count, price
+      INSERT INTO activity_packages (activity_id, session_count, price, sessions_per_week)
+      VALUES (${activityId}, ${sessionCount}, ${price}, ${sessionsPerWeek})
+      RETURNING id, activity_id, session_count, price, sessions_per_week
     `;
 
     return NextResponse.json({ package: pkg });

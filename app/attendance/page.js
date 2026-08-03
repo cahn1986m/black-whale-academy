@@ -80,6 +80,22 @@ function playErrorBeep(ctx) {
   } catch {}
 }
 
+// Recognized child, attendance recorded, but their subscription's time
+// window (expiry_date) has passed — independent of session count, and
+// deliberately distinct from playWarningBeep (sessions used up): a
+// two-tone descending square-wave "buzzer" instead of three quick beeps,
+// so staff can tell the two warnings apart by ear.
+function playExpiredDateBeep(ctx) {
+  try {
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const now = ctx.currentTime;
+    const duration = 0.22;
+    const gap = 0.04;
+    playTone(ctx, { start: now, duration, freq: 700, type: 'square' });
+    playTone(ctx, { start: now + duration + gap, duration, freq: 450, type: 'square' });
+  } catch {}
+}
+
 export default function AttendancePage() {
   const [activities, setActivities] = useState([]);
   const [activityId, setActivityId] = useState('');
@@ -167,6 +183,10 @@ export default function AttendancePage() {
       if (!res.ok) {
         if (audioCtxRef.current) playErrorBeep(audioCtxRef.current);
         setFlash({ type: 'error', text: data.error || 'كود غير معروف' });
+      } else if (data.dateExpired) {
+        if (audioCtxRef.current) playExpiredDateBeep(audioCtxRef.current);
+        setFlash({ type: 'error', text: `⚠️ تم تسجيل ${data.child.full_name} حاضر — لكن خلصت المدة (اطلب تجديد الاشتراك)` });
+        loadRecords();
       } else if (data.sessionsRemaining != null && data.sessionsRemaining <= 0) {
         if (audioCtxRef.current) playWarningBeep(audioCtxRef.current);
         setFlash({ type: 'error', text: `⚠️ تم تسجيل ${data.child.full_name} حاضر — لكن ما إله حصص متبقية (اطلب تجديد الاشتراك)` });
@@ -381,9 +401,11 @@ export default function AttendancePage() {
                 )}
                 <span className="name">
                   {r.full_name}
-                  {r.sessions_remaining <= 0 && (
+                  {r.date_expired ? (
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--absent)' }}>خلصت المدة</span>
+                  ) : r.sessions_remaining <= 0 ? (
                     <span style={{ display: 'block', fontSize: 11, color: 'var(--absent)' }}>خلصت الحصص</span>
-                  )}
+                  ) : null}
                 </span>
                 <button
                   type="button"

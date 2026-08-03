@@ -3,13 +3,20 @@ import { sql } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
+function addWeeks(date, weeks) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + weeks * 7);
+  return d.toISOString().slice(0, 10);
+}
+
 export async function GET(request, { params }) {
   try {
     const childId = Number(params.id);
 
     const enrollments = await sql`
       SELECT e.id, e.activity_id, a.name AS activity_name, a.emoji,
-        e.sessions_total, e.price_paid, e.sessions_used_offset,
+        e.sessions_total, e.price_paid, e.sessions_used_offset, e.expiry_date,
+        (e.expiry_date IS NOT NULL AND e.expiry_date < CURRENT_DATE) AS date_expired,
         COALESCE(u.used_count, 0) + e.sessions_used_offset AS sessions_used,
         e.sessions_total - COALESCE(u.used_count, 0) - e.sessions_used_offset AS sessions_remaining
       FROM enrollments e
@@ -54,10 +61,11 @@ export async function POST(request, { params }) {
     let packageId = null;
     let sessionsTotal;
     let pricePaid;
+    let sessionsPerWeek = null;
 
     if (body.packageId) {
       const [pkg] = await sql`
-        SELECT id, session_count, price FROM activity_packages
+        SELECT id, session_count, price, sessions_per_week FROM activity_packages
         WHERE id = ${Number(body.packageId)} AND activity_id = ${activityId}
       `;
       if (!pkg) {
@@ -66,6 +74,7 @@ export async function POST(request, { params }) {
       packageId = pkg.id;
       sessionsTotal = pkg.session_count;
       pricePaid = pkg.price;
+      sessionsPerWeek = pkg.sessions_per_week;
     } else {
       sessionsTotal = Number(body.sessionsTotal);
       if (!sessionsTotal || sessionsTotal <= 0) {
@@ -83,10 +92,32 @@ export async function POST(request, { params }) {
         package_id = EXCLUDED.package_id,
         sessions_total = enrollments.sessions_total + EXCLUDED.sessions_total,
         price_paid = COALESCE(enrollments.price_paid, 0) + COALESCE(EXCLUDED.price_paid, 0)
-      RETURNING id, child_id, activity_id, sessions_total, price_paid
+      RETURNING id, child_id, activity_id, sessions_total, price_paid, sessions_used_offset
     `;
 
-    return NextResponse.json({ enrollment });
+    // Expiry is always recomputed from *this* transaction's date (never from
+    // the old expiry_date), based on the remaining balance right after this
+    // enroll/renewal. A package with no weekly cap means no time limit —
+    // any previously-set expiry_date from a different package is cleared.
+    let expiryDate = null;
+    if (sessionsPerWeek && sessionsPerWeek > 0) {
+      const [usage] = await sql`
+        SELECT COUNT(*)::int AS used_count FROM activity_attendance
+        WHERE enrollment_id = ${enrollment.id} AND status = 'present'
+      `;
+      const sessionsUsed = usage.used_count + enrollment.sessions_used_offset;
+      const remaining = Math.max(enrollment.sessions_total - sessionsUsed, 0);
+      const weeks = Math.ceil(remaining / sessionsPerWeek);
+      expiryDate = addWeeks(new Date(), weeks);
+    }
+
+    const [updated] = await sql`
+      UPDATE enrollments SET expiry_date = ${expiryDate}
+      WHERE id = ${enrollment.id}
+      RETURNING id, child_id, activity_id, sessions_total, price_paid, expiry_date
+    `;
+
+    return NextResponse.json({ enrollment: updated });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

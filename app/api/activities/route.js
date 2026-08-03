@@ -14,7 +14,7 @@ export async function GET() {
       ORDER BY a.created_at ASC
     `;
     const packages = await sql`
-      SELECT id, activity_id, session_count, price
+      SELECT id, activity_id, session_count, price, sessions_per_week
       FROM activity_packages
       ORDER BY activity_id ASC, session_count ASC
     `;

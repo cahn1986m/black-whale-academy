@@ -297,7 +297,7 @@ export default function AdminPage() {
   const updatePackageDraft = (activityId, field, value) => {
     setPackageDraft((prev) => ({
       ...prev,
-      [activityId]: { ...(prev[activityId] || { sessionCount: '', price: '' }), [field]: value },
+      [activityId]: { ...(prev[activityId] || { sessionCount: '', price: '', sessionsPerWeek: '' }), [field]: value },
     }));
   };
 
@@ -305,6 +305,7 @@ export default function AdminPage() {
     const draft = packageDraft[activityId] || {};
     const sessionCount = Number(draft.sessionCount);
     const price = Number(draft.price);
+    const sessionsPerWeek = draft.sessionsPerWeek ? Number(draft.sessionsPerWeek) : null;
     if (!sessionCount || sessionCount <= 0) {
       alert('عدد الحصص مطلوب');
       return;
@@ -313,17 +314,21 @@ export default function AdminPage() {
       alert('السعر مطلوب');
       return;
     }
+    if (sessionsPerWeek !== null && (Number.isNaN(sessionsPerWeek) || sessionsPerWeek <= 0)) {
+      alert('عدد الحصص الأسبوعية غير صحيح');
+      return;
+    }
     const res = await fetch(`/api/activities/${activityId}/packages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionCount, price }),
+      body: JSON.stringify({ sessionCount, price, sessionsPerWeek }),
     });
     const data = await res.json();
     if (!res.ok) {
       alert('صار خطأ: ' + data.error);
       return;
     }
-    setPackageDraft((prev) => ({ ...prev, [activityId]: { sessionCount: '', price: '' } }));
+    setPackageDraft((prev) => ({ ...prev, [activityId]: { sessionCount: '', price: '', sessionsPerWeek: '' } }));
     load();
   };
 
@@ -794,7 +799,7 @@ export default function AdminPage() {
           <div className="tabs" style={{ marginTop: 12, flexWrap: 'wrap' }}>
             {a.packages.map((p) => (
               <span className="tab" key={p.id}>
-                {p.session_count} حصص · {p.price} درهم{' '}
+                {p.session_count} حصص · {p.price} درهم{p.sessions_per_week ? ` · ${p.sessions_per_week}/أسبوع` : ''}{' '}
                 <button
                   type="button"
                   onClick={() => deletePackage(p)}
@@ -821,6 +826,14 @@ export default function AdminPage() {
               placeholder="السعر (درهم)"
               value={packageDraft[a.id]?.price || ''}
               onChange={(e) => updatePackageDraft(a.id, 'price', e.target.value)}
+              style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+            />
+            <input
+              type="number"
+              min="1"
+              placeholder="حصص/أسبوع (اختياري)"
+              value={packageDraft[a.id]?.sessionsPerWeek || ''}
+              onChange={(e) => updatePackageDraft(a.id, 'sessionsPerWeek', e.target.value)}
               style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
             />
             <button className="btn secondary" type="button" onClick={() => addPackage(a.id)} style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }}>
@@ -1057,13 +1070,14 @@ export default function AdminPage() {
                         <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
                           {e.sessions_used}/{e.sessions_total} حصة
                           {e.price_paid != null ? ` — ${e.price_paid} درهم` : ''}
+                          {e.expiry_date ? ` — ينتهي ${formatDate(e.expiry_date)}` : ''}
                         </div>
                       </div>
                       <span
-                        className={`status-pill ${e.sessions_remaining > 0 ? 'present' : 'absent'}`}
+                        className={`status-pill ${e.date_expired || e.sessions_remaining <= 0 ? 'absent' : 'present'}`}
                         style={{ marginInlineStart: 'auto', marginInlineEnd: 8 }}
                       >
-                        {e.sessions_remaining > 0 ? `متبقي ${e.sessions_remaining}` : 'خلصت الحصص'}
+                        {e.date_expired ? 'خلصت المدة' : e.sessions_remaining > 0 ? `متبقي ${e.sessions_remaining}` : 'خلصت الحصص'}
                       </span>
                       <button
                         className="btn ghost"

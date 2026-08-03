@@ -18,7 +18,8 @@ export async function GET(request) {
     const rows = activityId
       ? await sql`
           SELECT e.id AS enrollment_id, c.id AS child_id, c.full_name, c.photo_base64,
-            e.sessions_total,
+            e.sessions_total, e.expiry_date,
+            (e.expiry_date IS NOT NULL AND e.expiry_date < CURRENT_DATE) AS date_expired,
             COALESCE(u.used_count, 0) + e.sessions_used_offset AS sessions_used,
             e.sessions_total - COALESCE(u.used_count, 0) - e.sessions_used_offset AS sessions_remaining,
             aa.status, aa.marked_at
@@ -52,9 +53,12 @@ export async function GET(request) {
   }
 }
 
-async function getSessionsRemaining(enrollmentId) {
+async function getEnrollmentStatus(enrollmentId) {
   const [row] = await sql`
-    SELECT e.sessions_total - COALESCE(u.used_count, 0) - e.sessions_used_offset AS sessions_remaining
+    SELECT
+      e.sessions_total - COALESCE(u.used_count, 0) - e.sessions_used_offset AS sessions_remaining,
+      e.expiry_date,
+      (e.expiry_date IS NOT NULL AND e.expiry_date < CURRENT_DATE) AS date_expired
     FROM enrollments e
     LEFT JOIN (
       SELECT enrollment_id, COUNT(*)::int AS used_count
@@ -64,7 +68,7 @@ async function getSessionsRemaining(enrollmentId) {
     ) u ON u.enrollment_id = e.id
     WHERE e.id = ${enrollmentId}
   `;
-  return row ? row.sessions_remaining : null;
+  return row || { sessions_remaining: null, expiry_date: null, date_expired: false };
 }
 
 export async function POST(request) {
@@ -119,9 +123,15 @@ export async function POST(request) {
       childId = enrollment?.child_id;
     }
     const [child] = await sql`SELECT id, full_name FROM children WHERE id = ${childId}`;
-    const sessionsRemaining = await getSessionsRemaining(enrollmentId);
+    const enrollmentStatus = await getEnrollmentStatus(enrollmentId);
 
-    return NextResponse.json({ record, child, sessionsRemaining });
+    return NextResponse.json({
+      record,
+      child,
+      sessionsRemaining: enrollmentStatus.sessions_remaining,
+      dateExpired: enrollmentStatus.date_expired,
+      expiryDate: enrollmentStatus.expiry_date,
+    });
   } catch (err) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
