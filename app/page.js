@@ -22,7 +22,7 @@ export default function HomePage() {
         </Link>
         <Link href="/register" className="nav-tile">
           <span className="emoji">📝</span>
-          <span className="label">تسجيل طفل</span>
+          <span className="label">تسجيل متدرب</span>
         </Link>
       </div>
 

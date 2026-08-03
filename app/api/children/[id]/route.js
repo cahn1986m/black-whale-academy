@@ -11,7 +11,7 @@ export async function GET(request, { params }) {
       FROM children WHERE id = ${id}
     `;
     if (!child) {
-      return NextResponse.json({ error: 'الطفل غير موجود' }, { status: 404 });
+      return NextResponse.json({ error: 'المتدرب غير موجود' }, { status: 404 });
     }
     return NextResponse.json({ child }, {
       headers: { 'Cache-Control': 'no-store, max-age=0' },

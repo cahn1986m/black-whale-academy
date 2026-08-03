@@ -44,7 +44,7 @@ export async function POST(request, { params }) {
 
     const [child] = await sql`SELECT id FROM children WHERE id = ${childId}`;
     if (!child) {
-      return NextResponse.json({ error: 'الطفل غير موجود' }, { status: 404 });
+      return NextResponse.json({ error: 'المتدرب غير موجود' }, { status: 404 });
     }
     const [activity] = await sql`SELECT id FROM activities WHERE id = ${activityId}`;
     if (!activity) {

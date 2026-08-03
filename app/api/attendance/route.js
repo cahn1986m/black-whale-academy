@@ -93,7 +93,7 @@ export async function POST(request) {
         SELECT id FROM enrollments WHERE child_id = ${childId} AND activity_id = ${activityId}
       `;
       if (!enrollment) {
-        return NextResponse.json({ error: 'الطفل غير مسجل بهذا النشاط' }, { status: 404 });
+        return NextResponse.json({ error: 'المتدرب غير مسجل بهذا النشاط' }, { status: 404 });
       }
       enrollmentId = enrollment.id;
     }

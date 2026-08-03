@@ -40,7 +40,7 @@ export default function ChildBadgePage({ params }) {
   return (
     <div className="page">
       <a href="/admin" className="back-link">← الإدارة</a>
-      <Header sub="بطاقة الطفل" />
+      <Header sub="بطاقة المتدرب" />
       {error && <div className="msg error">{error}</div>}
       {!child && !error && <div className="empty">جاري التحميل...</div>}
       {child && (

@@ -10,17 +10,64 @@ export const dynamic = 'force-dynamic';
 export async function POST(request) {
   try {
     const body = await request.json().catch(() => ({}));
+
     const fullName = (body.fullName || '').trim();
-    const parentContact = (body.parentContact || '').trim();
+    const dateOfBirth = (body.dateOfBirth || '').trim();
+    const nationality = (body.nationality || '').trim();
+    const gender = (body.gender || '').trim();
+    const parentFullName = (body.parentFullName || '').trim();
+    const relationshipToChild = (body.relationshipToChild || '').trim();
+    const parentPhone = (body.parentPhone || '').trim();
+    const parentEmail = (body.parentEmail || '').trim();
+    const address = (body.address || '').trim() || null;
     const photoBase64 = body.photoBase64 || null;
     const rawSelections = Array.isArray(body.selections) ? body.selections : [];
 
-    if (!fullName) {
-      return NextResponse.json({ error: 'اسم الطفل مطلوب' }, { status: 400 });
-    }
+    const hasMedicalCondition = body.hasMedicalCondition;
+    const medicalConditionDetails = (body.medicalConditionDetails || '').trim() || null;
+    const isOnMedication = body.isOnMedication;
+    const medicationDetails = (body.medicationDetails || '').trim() || null;
+    const consentTermsAccepted = body.consentTermsAccepted === true;
+    const consentMarketingPhotos = body.consentMarketingPhotos === true;
 
-    if (!parentContact) {
+    if (!fullName) {
+      return NextResponse.json({ error: 'اسم المتدرب مطلوب' }, { status: 400 });
+    }
+    if (!dateOfBirth) {
+      return NextResponse.json({ error: 'تاريخ ميلاد المتدرب مطلوب' }, { status: 400 });
+    }
+    if (!nationality) {
+      return NextResponse.json({ error: 'الجنسية مطلوبة' }, { status: 400 });
+    }
+    if (gender !== 'male' && gender !== 'female') {
+      return NextResponse.json({ error: 'الجنس مطلوب' }, { status: 400 });
+    }
+    if (!parentFullName) {
+      return NextResponse.json({ error: 'اسم ولي الأمر مطلوب' }, { status: 400 });
+    }
+    if (!relationshipToChild) {
+      return NextResponse.json({ error: 'صلة القرابة مطلوبة' }, { status: 400 });
+    }
+    if (!parentPhone) {
       return NextResponse.json({ error: 'رقم تواصل ولي الأمر مطلوب' }, { status: 400 });
+    }
+    if (!parentEmail) {
+      return NextResponse.json({ error: 'البريد الإلكتروني لولي الأمر مطلوب' }, { status: 400 });
+    }
+    if (typeof hasMedicalCondition !== 'boolean') {
+      return NextResponse.json({ error: 'الرجاء الإجابة عن سؤال الحالة الصحية' }, { status: 400 });
+    }
+    if (hasMedicalCondition && !medicalConditionDetails) {
+      return NextResponse.json({ error: 'الرجاء ذكر تفاصيل الحالة الصحية' }, { status: 400 });
+    }
+    if (typeof isOnMedication !== 'boolean') {
+      return NextResponse.json({ error: 'الرجاء الإجابة عن سؤال الأدوية' }, { status: 400 });
+    }
+    if (isOnMedication && !medicationDetails) {
+      return NextResponse.json({ error: 'الرجاء ذكر تفاصيل الأدوية' }, { status: 400 });
+    }
+    if (!consentTermsAccepted) {
+      return NextResponse.json({ error: 'الموافقة على الشروط والأحكام مطلوبة للمتابعة' }, { status: 400 });
     }
 
     // Dedupe by activityId (keep the first package pick per activity).
@@ -52,8 +99,22 @@ export async function POST(request) {
       const qrToken = nanoid();
       try {
         [child] = await sql`
-          INSERT INTO children (full_name, parent_phone, photo_base64, qr_token)
-          VALUES (${fullName}, ${parentContact}, ${photoBase64}, ${qrToken})
+          INSERT INTO children (
+            full_name, parent_phone, photo_base64, qr_token,
+            date_of_birth, nationality, gender,
+            parent_full_name, relationship_to_child, parent_email, address,
+            has_medical_condition, medical_condition_details,
+            is_on_medication, medication_details,
+            consent_terms_accepted, consent_terms_accepted_at, consent_marketing_photos
+          )
+          VALUES (
+            ${fullName}, ${parentPhone}, ${photoBase64}, ${qrToken},
+            ${dateOfBirth}, ${nationality}, ${gender},
+            ${parentFullName}, ${relationshipToChild}, ${parentEmail}, ${address},
+            ${hasMedicalCondition}, ${medicalConditionDetails},
+            ${isOnMedication}, ${medicationDetails},
+            ${consentTermsAccepted}, now(), ${consentMarketingPhotos}
+          )
           RETURNING id, full_name, qr_token
         `;
         break;

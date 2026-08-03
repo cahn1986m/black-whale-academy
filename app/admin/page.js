@@ -371,7 +371,7 @@ export default function AdminPage() {
   };
 
   const resetAllData = async () => {
-    const typed = window.prompt('هاد الإجراء رح يمسح كل الأطفال والأنشطة والاشتراكات وسجلات الحضور نهائياً ومايمكن التراجع. للتأكيد، اكتب بالضبط: DELETE ALL');
+    const typed = window.prompt('هاد الإجراء رح يمسح كل المتدربين والأنشطة والاشتراكات وسجلات الحضور نهائياً ومايمكن التراجع. للتأكيد، اكتب بالضبط: DELETE ALL');
     if (typed !== 'DELETE ALL') {
       if (typed !== null) alert('النص غير مطابق. تم الإلغاء.');
       return;
@@ -595,7 +595,7 @@ export default function AdminPage() {
         </div>
       )}
 
-      <Header sub="إدارة الأنشطة والأطفال" />
+      <Header sub="إدارة الأنشطة والمتدربين" />
 
       <button
         className="btn secondary"
@@ -749,9 +749,9 @@ export default function AdminPage() {
       </button>
 
       <div style={{ fontWeight: 'bold', margin: '22px 0 10px' }}>
-        الأطفال المسجلين ({children.length})
+        المتدربين المسجلين ({children.length})
       </div>
-      {children.length === 0 && <div className="empty">ما في أطفال مسجلين بعد</div>}
+      {children.length === 0 && <div className="empty">ما في متدربين مسجلين بعد</div>}
       {children.map((c) => (
         <div key={c.id}>
           <div className="child-row" onClick={() => toggleExpand(c.id)} style={{ cursor: 'pointer' }}>
@@ -848,7 +848,7 @@ export default function AdminPage() {
                     {editingOffsetActivityId === e.activity_id && (
                       <div style={{ marginTop: 8 }}>
                         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>
-                          عدد الحصص يلي حضرها الطفل يدوياً (تفقد ورقي) قبل استخدام النظام — بتنضاف على أي حصص متسجّلة عبر مسح QR
+                          عدد الحصص يلي حضرها المتدرب يدوياً (تفقد ورقي) قبل استخدام النظام — بتنضاف على أي حصص متسجّلة عبر مسح QR
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <input

@@ -371,7 +371,7 @@ export default function AttendancePage() {
 
           <div style={{ marginTop: 16 }}>
             {loading && <div className="empty">جاري التحميل...</div>}
-            {!loading && records.length === 0 && <div className="empty">ما في أطفال مسجلين بهالنشاط بعد</div>}
+            {!loading && records.length === 0 && <div className="empty">ما في متدربين مسجلين بهالنشاط بعد</div>}
             {records.map((r) => (
               <div className="child-row" key={r.enrollment_id}>
                 {r.photo_base64 ? (
