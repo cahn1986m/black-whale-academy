@@ -3,32 +3,38 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '../../Header';
-
-function formatSessionDateTime(dateStr, timeStr) {
-  const date = new Date(dateStr).toLocaleDateString('ar-EG', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-  const time = (timeStr || '').slice(0, 5);
-  return { date, time };
-}
-
-function eventMessage(n) {
-  const { date, time } = formatSessionDateTime(n.session_date, n.session_time);
-  switch (n.event_type) {
-    case 'approved':
-      return `تمت الموافقة على جلستك بتاريخ ${date} الساعة ${time}`;
-    case 'rejected':
-      return `تم رفض جلستك بتاريخ ${date} الساعة ${time}`;
-    case 'closed':
-      return `تم إغلاق جلستك بتاريخ ${date} الساعة ${time}`;
-    default:
-      return n.event_type;
-  }
-}
+import { useLocale, useTranslations } from '@/lib/locale/LocaleContext';
 
 export default function FreelancerNotificationsPage() {
+  const { locale } = useLocale();
+  const t = useTranslations('freelancer');
+  const tc = useTranslations('common');
+  const dateLocale = locale === 'en' ? 'en-US' : 'ar-EG';
+
+  const formatSessionDateTime = (dateStr, timeStr) => {
+    const date = new Date(dateStr).toLocaleDateString(dateLocale, {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+    const time = (timeStr || '').slice(0, 5);
+    return { date, time };
+  };
+
+  const eventMessage = (n) => {
+    const { date, time } = formatSessionDateTime(n.session_date, n.session_time);
+    switch (n.event_type) {
+      case 'approved':
+        return t('eventApproved', { date, time });
+      case 'rejected':
+        return t('eventRejected', { date, time });
+      case 'closed':
+        return t('eventClosed', { date, time });
+      default:
+        return n.event_type;
+    }
+  };
+
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -37,7 +43,7 @@ export default function FreelancerNotificationsPage() {
     fetch('/api/freelancer/notifications', { cache: 'no-store' })
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'صار خطأ');
+        if (!res.ok) throw new Error(data.error || tc('error'));
         setNotifications(data.notifications);
       })
       .catch((err) => setError(err.message))
@@ -48,7 +54,7 @@ export default function FreelancerNotificationsPage() {
     try {
       const res = await fetch(`/api/freelancer/notifications/${id}/read`, { method: 'PATCH' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n))
       );
@@ -59,12 +65,12 @@ export default function FreelancerNotificationsPage() {
 
   return (
     <div className="page">
-      <Header sub="الإشعارات" />
+      <Header sub={t('notificationsSub')} />
       {error && <div className="msg error">{error}</div>}
 
-      {loading && <div className="empty">جاري التحميل...</div>}
+      {loading && <div className="empty">{tc('loading')}</div>}
 
-      {!loading && notifications.length === 0 && <div className="empty">ما في إشعارات بعد</div>}
+      {!loading && notifications.length === 0 && <div className="empty">{t('noNotificationsYet')}</div>}
 
       {!loading &&
         notifications.map((n) => (
@@ -88,13 +94,13 @@ export default function FreelancerNotificationsPage() {
                   className="status-pill"
                   style={{ color: 'var(--text)', background: 'rgba(15, 58, 82, 0.10)', flexShrink: 0 }}
                 >
-                  جديد
+                  {t('newBadge')}
                 </span>
               )}
             </div>
 
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
-              {new Date(n.created_at).toLocaleString('ar-EG', {
+              {new Date(n.created_at).toLocaleString(dateLocale, {
                 day: 'numeric',
                 month: 'long',
                 year: 'numeric',
@@ -105,7 +111,7 @@ export default function FreelancerNotificationsPage() {
 
             <div style={{ marginTop: 8 }}>
               <Link href={`/freelancer/sessions/${n.session_id}`} style={{ fontSize: 13, color: 'var(--accent-dark)' }}>
-                عرض الجلسة ←
+                {t('viewSession')}
               </Link>
             </div>
           </div>

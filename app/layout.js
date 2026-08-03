@@ -1,4 +1,6 @@
 import { Cairo } from 'next/font/google';
+import { cookies } from 'next/headers';
+import { LocaleProvider } from '@/lib/locale/LocaleContext';
 import './globals.css';
 
 const cairo = Cairo({
@@ -19,19 +21,25 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }) {
+  const localeCookie = cookies().get('bwa_locale')?.value;
+  const locale = localeCookie === 'en' ? 'en' : 'ar';
+  const dir = locale === 'en' ? 'ltr' : 'rtl';
+
   return (
-    <html lang="ar" dir="rtl" className={cairo.variable}>
+    <html lang={locale} dir={dir} className={cairo.variable}>
       <body>
-        <div className="bg-decor" aria-hidden="true">
-          <span>🏊</span>
-          <span>⚽</span>
-          <span>🏀</span>
-          <span>🤸</span>
-          <span>🥋</span>
-          <span>🥊</span>
-          <span>🌊</span>
-        </div>
-        {children}
+        <LocaleProvider initialLocale={locale}>
+          <div className="bg-decor" aria-hidden="true">
+            <span>🏊</span>
+            <span>⚽</span>
+            <span>🏀</span>
+            <span>🤸</span>
+            <span>🥋</span>
+            <span>🥊</span>
+            <span>🌊</span>
+          </div>
+          {children}
+        </LocaleProvider>
       </body>
     </html>
   );

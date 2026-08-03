@@ -3,8 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import Header from '../../../Header';
+import { useTranslations } from '@/lib/locale/LocaleContext';
 
 export default function ChildBadgePage({ params }) {
+  const t = useTranslations('admin');
+  const tc = useTranslations('common');
   const [child, setChild] = useState(null);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
@@ -17,7 +20,8 @@ export default function ChildBadgePage({ params }) {
         if (data.error) setError(data.error);
         else setChild(data.child);
       })
-      .catch(() => setError('صار خطأ بالاتصال — تأكد من الإنترنت وحاول مرة تانية'));
+      .catch(() => setError(t('connectionError')));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
   const downloadBadge = async () => {
@@ -31,7 +35,7 @@ export default function ChildBadgePage({ params }) {
       link.download = `qr-${child.full_name}.png`;
       link.click();
     } catch {
-      alert('ما قدرنا ننشئ الصورة، جرب مرة تانية');
+      alert(t('errBadgeDownload'));
     } finally {
       setDownloading(false);
     }
@@ -39,10 +43,10 @@ export default function ChildBadgePage({ params }) {
 
   return (
     <div className="page">
-      <a href="/admin" className="back-link">← الإدارة</a>
-      <Header sub="بطاقة المتدرب" />
+      <a href="/admin" className="back-link">← {t('backToManagement')}</a>
+      <Header sub={t('badgeSub')} />
       {error && <div className="msg error">{error}</div>}
-      {!child && !error && <div className="empty">جاري التحميل...</div>}
+      {!child && !error && <div className="empty">{tc('loading')}</div>}
       {child && (
         <>
           <div className="badge-card" ref={badgeRef}>
@@ -54,10 +58,10 @@ export default function ChildBadgePage({ params }) {
             <div style={{ fontSize: 12, color: '#666' }}>Black Whale Academy 🐋</div>
           </div>
           <button className="btn secondary" onClick={downloadBadge} disabled={downloading} type="button">
-            {downloading ? 'جاري التحضير...' : '📥 تحميل صورة'}
+            {downloading ? t('preparingImage') : t('downloadImage')}
           </button>
           <button className="btn secondary" onClick={() => window.print()} type="button" style={{ marginTop: 8 }}>
-            🖨️ طباعة البطاقة
+            {t('printBadge')}
           </button>
         </>
       )}

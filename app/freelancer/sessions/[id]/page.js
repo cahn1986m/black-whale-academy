@@ -3,14 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import Header from '../../../Header';
-
-const STATUS_LABELS = {
-  pending: 'بانتظار الموافقة',
-  approved: 'موافق عليها',
-  checked_in: 'جارية',
-  closed: 'مغلقة',
-  rejected: 'مرفوضة',
-};
+import { useLocale, useTranslations } from '@/lib/locale/LocaleContext';
 
 // Same technique already used by .status-pill.present/.absent in
 // globals.css (rgba tint + a solid existing color var) — no new CSS
@@ -32,12 +25,6 @@ function statusPillStyle(status) {
   }
 }
 
-const TOKEN_STATUS_LABELS = {
-  unused: 'غير مستخدم',
-  scanned: 'انمسح',
-  expired_no_show: 'انتهى (غياب)',
-};
-
 function tokenStatusPillStyle(status) {
   switch (status) {
     case 'unused':
@@ -52,6 +39,24 @@ function tokenStatusPillStyle(status) {
 }
 
 export default function FreelancerSessionDetailsPage({ params }) {
+  const { locale } = useLocale();
+  const t = useTranslations('freelancer');
+  const tc = useTranslations('common');
+  const dateLocale = locale === 'en' ? 'en-US' : 'ar-EG';
+
+  const STATUS_LABELS = {
+    pending: t('statusPending'),
+    approved: t('statusApproved'),
+    checked_in: t('statusCheckedIn'),
+    closed: t('statusClosed'),
+    rejected: t('statusRejected'),
+  };
+  const TOKEN_STATUS_LABELS = {
+    unused: t('tokenUnused'),
+    scanned: t('tokenScanned'),
+    expired_no_show: t('tokenExpiredNoShow'),
+  };
+
   const sessionId = params.id;
   const [session, setSession] = useState(null);
   const [levelCounts, setLevelCounts] = useState([]);
@@ -80,7 +85,7 @@ export default function FreelancerSessionDetailsPage({ params }) {
     return fetch(`/api/freelancer/sessions/${sessionId}`, { cache: 'no-store' })
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'صار خطأ');
+        if (!res.ok) throw new Error(data.error || tc('error'));
         setSession(data.session);
         setLevelCounts(data.levelCounts);
         setQrTokens(data.qrTokens);
@@ -103,7 +108,7 @@ export default function FreelancerSessionDetailsPage({ params }) {
         body: JSON.stringify({ level }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setQrTokens((prev) => [
         ...prev,
         {
@@ -134,19 +139,19 @@ export default function FreelancerSessionDetailsPage({ params }) {
       link.download = `qr-freelancer-session-${sessionId}-${token.level}-${token.id}.png`;
       link.click();
     } catch {
-      alert('ما قدرنا ننشئ الصورة، جرب مرة تانية');
+      alert(t('errBadgeDownload'));
     } finally {
       setDownloadingTokenId(null);
     }
   };
 
   const closeSession = async () => {
-    if (!window.confirm('متأكد إنك بدك تقفل الجلسة؟ هذا الإجراء نهائي ولا يمكن التراجع عنه')) return;
+    if (!window.confirm(t('closeSessionConfirm'))) return;
     setClosing(true);
     try {
       const res = await fetch(`/api/freelancer/sessions/${sessionId}/close`, { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       loadSession();
     } catch (err) {
       setError(err.message);
@@ -159,10 +164,10 @@ export default function FreelancerSessionDetailsPage({ params }) {
 
   return (
     <div className="page">
-      <Header sub="تفاصيل الجلسة" />
+      <Header sub={t('sessionDetailsSub')} />
       {error && <div className="msg error">{error}</div>}
 
-      {loading && <div className="empty">جاري التحميل...</div>}
+      {loading && <div className="empty">{tc('loading')}</div>}
 
       {!loading && session && (
         <>
@@ -170,7 +175,7 @@ export default function FreelancerSessionDetailsPage({ params }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div style={{ fontWeight: 'bold' }}>
-                  {new Date(session.session_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {new Date(session.session_date).toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' })}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{session.session_time.slice(0, 5)}</div>
               </div>
@@ -181,14 +186,14 @@ export default function FreelancerSessionDetailsPage({ params }) {
 
             {session.status === 'rejected' && session.rejection_reason && (
               <div className="msg error" style={{ marginTop: 12, marginBottom: 0 }}>
-                سبب الرفض: {session.rejection_reason}
+                {t('rejectionReason', { reason: session.rejection_reason })}
               </div>
             )}
           </div>
 
-          <div style={{ fontWeight: 'bold', margin: '18px 0 10px' }}>الأعداد المطلوبة</div>
+          <div style={{ fontWeight: 'bold', margin: '18px 0 10px' }}>{t('requiredCounts')}</div>
           {levelCounts.map((lc) => {
-            const generated = qrTokens.filter((t) => t.level === lc.level).length;
+            const generated = qrTokens.filter((tok) => tok.level === lc.level).length;
             const remaining = lc.child_count - generated;
             return (
               <div className="card" key={lc.level}>
@@ -196,7 +201,7 @@ export default function FreelancerSessionDetailsPage({ params }) {
                   <div>
                     <div style={{ fontWeight: 'bold' }}>{lc.level}</div>
                     <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                      مطلوب {lc.child_count} — متولّد {generated} — متبقي {Math.max(remaining, 0)}
+                      {t('countsSummary', { required: lc.child_count, generated, remaining: Math.max(remaining, 0) })}
                     </div>
                   </div>
                   {canOperate && remaining > 0 && (
@@ -207,7 +212,7 @@ export default function FreelancerSessionDetailsPage({ params }) {
                       disabled={generatingLevel === lc.level}
                       style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }}
                     >
-                      {generatingLevel === lc.level ? 'جاري التوليد...' : 'توليد رمز QR'}
+                      {generatingLevel === lc.level ? t('generating') : t('generateQrToken')}
                     </button>
                   )}
                 </div>
@@ -217,38 +222,38 @@ export default function FreelancerSessionDetailsPage({ params }) {
 
           {qrTokens.length > 0 && (
             <>
-              <div style={{ fontWeight: 'bold', margin: '18px 0 10px' }}>رموز QR المولّدة</div>
-              {qrTokens.map((t) => (
-                <div className="card" key={t.id}>
+              <div style={{ fontWeight: 'bold', margin: '18px 0 10px' }}>{t('generatedQrTokens')}</div>
+              {qrTokens.map((tok) => (
+                <div className="card" key={tok.id}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
                     <div>
-                      <div style={{ fontWeight: 'bold' }}>{t.level}</div>
-                      {t.scanned_at && (
+                      <div style={{ fontWeight: 'bold' }}>{tok.level}</div>
+                      {tok.scanned_at && (
                         <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                          انمسح: {new Date(t.scanned_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                          {t('scannedAt', { time: new Date(tok.scanned_at).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' }) })}
                         </div>
                       )}
                     </div>
-                    <span className="status-pill" style={tokenStatusPillStyle(t.status)}>
-                      {TOKEN_STATUS_LABELS[t.status] || t.status}
+                    <span className="status-pill" style={tokenStatusPillStyle(tok.status)}>
+                      {TOKEN_STATUS_LABELS[tok.status] || tok.status}
                     </span>
                   </div>
-                  {t.status === 'unused' && (
+                  {tok.status === 'unused' && (
                     <>
                       <div
-                        ref={setQrContainerRef(t.id)}
+                        ref={setQrContainerRef(tok.id)}
                         style={{ display: 'flex', justifyContent: 'center', background: '#ffffff', padding: 12 }}
                       >
-                        <QRCodeSVG value={t.token} size={160} />
+                        <QRCodeSVG value={tok.token} size={160} />
                       </div>
                       <button
                         className="btn secondary"
                         type="button"
-                        onClick={() => downloadTokenImage(t)}
-                        disabled={downloadingTokenId === t.id}
+                        onClick={() => downloadTokenImage(tok)}
+                        disabled={downloadingTokenId === tok.id}
                         style={{ marginTop: 10 }}
                       >
-                        {downloadingTokenId === t.id ? 'جاري التحضير...' : '📥 تحميل صورة'}
+                        {downloadingTokenId === tok.id ? t('preparingImage') : t('downloadImage')}
                       </button>
                     </>
                   )}
@@ -265,7 +270,7 @@ export default function FreelancerSessionDetailsPage({ params }) {
               disabled={closing}
               style={{ marginTop: 8, borderColor: 'var(--absent)', color: 'var(--absent)' }}
             >
-              {closing ? 'جاري الإغلاق...' : 'إغلاق الجلسة يدوياً'}
+              {closing ? t('closing') : t('closeSessionManually')}
             </button>
           )}
         </>

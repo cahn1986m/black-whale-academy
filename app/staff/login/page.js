@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import Header from '../../Header';
+import { useTranslations } from '@/lib/locale/LocaleContext';
 
 export default function StaffLoginPage() {
+  const t = useTranslations('staff');
+  const tc = useTranslations('common');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -12,7 +15,7 @@ export default function StaffLoginPage() {
     e.preventDefault();
     setError('');
     if (!password) {
-      setError('كلمة المرور مطلوبة');
+      setError(t('passwordRequired'));
       return;
     }
     setSubmitting(true);
@@ -23,7 +26,7 @@ export default function StaffLoginPage() {
         body: JSON.stringify({ password }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       const next = new URLSearchParams(window.location.search).get('next') || '/staff';
       window.location.href = next;
     } catch (err) {
@@ -35,12 +38,12 @@ export default function StaffLoginPage() {
 
   return (
     <div className="page">
-      <Header sub="دخول الموظفين" />
+      <Header sub={t('staffLoginSub')} />
       {error && <div className="msg error">{error}</div>}
       <form onSubmit={submit}>
         <div className="card">
           <div className="field">
-            <label>كلمة المرور</label>
+            <label>{t('loginPasswordLabel')}</label>
             <input
               type="password"
               value={password}
@@ -50,7 +53,7 @@ export default function StaffLoginPage() {
             />
           </div>
           <button className="btn" type="submit" disabled={submitting}>
-            {submitting ? 'جاري الدخول...' : 'دخول'}
+            {submitting ? t('loggingIn') : t('loginButton')}
           </button>
         </div>
       </form>

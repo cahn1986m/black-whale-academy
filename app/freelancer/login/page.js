@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import Header from '../../Header';
+import { useTranslations } from '@/lib/locale/LocaleContext';
 
 export default function FreelancerLoginPage() {
+  const t = useTranslations('freelancer');
+  const tc = useTranslations('common');
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -14,7 +17,7 @@ export default function FreelancerLoginPage() {
     e.preventDefault();
     setError('');
     if (!phone || !pin) {
-      setError('رقم الجوال والرمز مطلوبان');
+      setError(t('phoneAndPinRequired'));
       return;
     }
     setSubmitting(true);
@@ -25,7 +28,7 @@ export default function FreelancerLoginPage() {
         body: JSON.stringify({ phone, pin, rememberMe }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       const rawNext = new URLSearchParams(window.location.search).get('next');
       const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/freelancer';
       window.location.href = next;
@@ -38,12 +41,12 @@ export default function FreelancerLoginPage() {
 
   return (
     <div className="page">
-      <Header sub="دخول المدربين المستقلين" />
+      <Header sub={t('loginSub')} />
       {error && <div className="msg error">{error}</div>}
       <form onSubmit={submit}>
         <div className="card">
           <div className="field">
-            <label>رقم الجوال</label>
+            <label>{t('phoneLabel')}</label>
             <input
               type="tel"
               value={phone}
@@ -53,7 +56,7 @@ export default function FreelancerLoginPage() {
             />
           </div>
           <div className="field">
-            <label>الرمز (PIN)</label>
+            <label>{t('pinLabel')}</label>
             <input
               type="password"
               inputMode="numeric"
@@ -70,11 +73,11 @@ export default function FreelancerLoginPage() {
                 checked={rememberMe}
                 onChange={(e) => setRememberMe(e.target.checked)}
               />
-              <span>تذكرني على هذا الجهاز</span>
+              <span>{t('rememberMe')}</span>
             </label>
           </div>
           <button className="btn" type="submit" disabled={submitting}>
-            {submitting ? 'جاري الدخول...' : 'دخول'}
+            {submitting ? t('loggingIn') : t('loginButton')}
           </button>
         </div>
       </form>

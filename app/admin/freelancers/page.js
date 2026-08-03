@@ -2,27 +2,32 @@
 
 import { useEffect, useState } from 'react';
 import Header from '../../Header';
+import { useLocale, useTranslations } from '@/lib/locale/LocaleContext';
 
 const PIN_REGEX = /^\d{4}$/;
-
-const PAYMENT_TYPE_LABELS = {
-  prepaid: 'مسبق الدفع',
-  monthly: 'شهري',
-  on_account: 'على الحساب',
-};
-
-const ENTRY_TYPE_LABELS = {
-  payment: 'دفعة',
-  session_charge: 'تحصيل جلسة',
-  no_show_fee: 'غرامة غياب',
-  reversal: 'عكس حركة',
-};
 
 function isLocked(lockedUntil) {
   return Boolean(lockedUntil) && new Date(lockedUntil).getTime() > Date.now();
 }
 
 export default function AdminFreelancersPage() {
+  const { locale } = useLocale();
+  const t = useTranslations('admin');
+  const tc = useTranslations('common');
+  const dateLocale = locale === 'en' ? 'en-US' : 'ar-EG';
+
+  const PAYMENT_TYPE_LABELS = {
+    prepaid: t('paymentTypePrepaid'),
+    monthly: t('paymentTypeMonthly'),
+    on_account: t('paymentTypeOnAccount'),
+  };
+  const ENTRY_TYPE_LABELS = {
+    payment: t('entryPayment'),
+    session_charge: t('entrySessionCharge'),
+    no_show_fee: t('entryNoShowFee'),
+    reversal: t('entryReversal'),
+  };
+
   const [freelancers, setFreelancers] = useState([]);
   const [levelPricing, setLevelPricing] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -57,8 +62,8 @@ export default function AdminFreelancersPage() {
       ]);
       const fData = await fRes.json();
       const lData = await lRes.json();
-      if (!fRes.ok) throw new Error(fData.error || 'صار خطأ');
-      if (!lRes.ok) throw new Error(lData.error || 'صار خطأ');
+      if (!fRes.ok) throw new Error(fData.error || tc('error'));
+      if (!lRes.ok) throw new Error(lData.error || tc('error'));
       setFreelancers(fData.freelancers);
       setLevelPricing(lData.pricing);
     } catch (err) {
@@ -80,11 +85,11 @@ export default function AdminFreelancersPage() {
     const pin = freelancerForm.pin;
 
     if (!name || !phone) {
-      setFreelancerFormError('الاسم ورقم الجوال مطلوبان');
+      setFreelancerFormError(t('nameAndPhoneRequired'));
       return;
     }
     if (!PIN_REGEX.test(pin)) {
-      setFreelancerFormError('الرمز يجب أن يكون 4 أرقام بالضبط');
+      setFreelancerFormError(t('pinMustBe4Digits'));
       return;
     }
 
@@ -96,7 +101,7 @@ export default function AdminFreelancersPage() {
         body: JSON.stringify({ name, phone, pin }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setFreelancers((prev) =>
         [
           ...prev,
@@ -128,8 +133,8 @@ export default function AdminFreelancersPage() {
       ]);
       const detailData = await detailRes.json();
       const ledgerData = await ledgerRes.json();
-      if (!detailRes.ok) throw new Error(detailData.error || 'صار خطأ');
-      if (!ledgerRes.ok) throw new Error(ledgerData.error || 'صار خطأ');
+      if (!detailRes.ok) throw new Error(detailData.error || tc('error'));
+      if (!ledgerRes.ok) throw new Error(ledgerData.error || tc('error'));
       setFreelancerDetail({ freelancer: detailData.freelancer, pricingOverrides: detailData.pricingOverrides });
       setFreelancerLedger({ entries: ledgerData.entries, currentBalance: ledgerData.currentBalance });
     } catch (err) {
@@ -143,7 +148,7 @@ export default function AdminFreelancersPage() {
     try {
       const res = await fetch(`/api/admin/freelancers/${freelancerId}/ledger`, { cache: 'no-store' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setFreelancerLedger({ entries: data.entries, currentBalance: data.currentBalance });
       setFreelancers((prev) =>
         prev.map((f) => (f.id === freelancerId ? { ...f, current_balance: data.currentBalance } : f))
@@ -154,7 +159,7 @@ export default function AdminFreelancersPage() {
           : prev
       );
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     }
   };
 
@@ -178,7 +183,7 @@ export default function AdminFreelancersPage() {
   };
 
   const reverseEntry = async (freelancerId, entry) => {
-    const reason = window.prompt('اكتب سبب عكس هالحركة');
+    const reason = window.prompt(t('reverseReasonPrompt'));
     if (reason === null) return;
     const trimmedReason = reason.trim();
     if (!trimmedReason) return;
@@ -194,27 +199,27 @@ export default function AdminFreelancersPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       loadLedger(freelancerId);
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     }
   };
 
   const savePayment = async (freelancerId) => {
     setPaymentFormError('');
     if (paymentDirection !== 'in' && paymentDirection !== 'out') {
-      setPaymentFormError('اختر اتجاه الحركة');
+      setPaymentFormError(t('directionRequired'));
       return;
     }
     const amountValue = Number(paymentAmount);
     if (!Number.isFinite(amountValue) || amountValue <= 0) {
-      setPaymentFormError('المبلغ يجب أن يكون رقماً موجباً');
+      setPaymentFormError(t('amountMustBePositive'));
       return;
     }
     const trimmedNote = paymentNote.trim();
     if (!trimmedNote) {
-      setPaymentFormError('الملاحظة مطلوبة');
+      setPaymentFormError(t('noteRequired'));
       return;
     }
     const signedAmount = paymentDirection === 'in' ? amountValue : -amountValue;
@@ -226,7 +231,7 @@ export default function AdminFreelancersPage() {
         body: JSON.stringify({ entryType: 'payment', amount: signedAmount, note: trimmedNote }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setPaymentDirection('');
       setPaymentAmount('');
       setPaymentNote('');
@@ -248,7 +253,7 @@ export default function AdminFreelancersPage() {
         body: JSON.stringify({ is_active: nextActive }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setFreelancers((prev) => prev.map((f) => (f.id === freelancer.id ? { ...f, is_active: nextActive } : f)));
       setFreelancerDetail((prev) =>
         prev && prev.freelancer.id === freelancer.id
@@ -256,7 +261,7 @@ export default function AdminFreelancersPage() {
           : prev
       );
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     }
   };
 
@@ -268,7 +273,7 @@ export default function AdminFreelancersPage() {
         body: JSON.stringify({ payment_type: paymentType }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setFreelancers((prev) => prev.map((f) => (f.id === freelancerId ? { ...f, payment_type: paymentType } : f)));
       setFreelancerDetail((prev) =>
         prev && prev.freelancer.id === freelancerId
@@ -276,15 +281,15 @@ export default function AdminFreelancersPage() {
           : prev
       );
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     }
   };
 
   const resetPin = async (freelancerId) => {
-    const newPin = window.prompt('أدخل رمز PIN جديد (4 أرقام)');
+    const newPin = window.prompt(t('newPinPrompt'));
     if (newPin === null) return;
     if (!PIN_REGEX.test(newPin)) {
-      alert('الرمز يجب أن يكون 4 أرقام بالضبط');
+      alert(t('pinMustBe4Digits'));
       return;
     }
     try {
@@ -294,22 +299,22 @@ export default function AdminFreelancersPage() {
         body: JSON.stringify({ newPin }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
-      alert('تم تصفير الرمز بنجاح.');
+      if (!res.ok) throw new Error(data.error || tc('error'));
+      alert(t('pinResetSuccess'));
       setFreelancerDetail((prev) =>
         prev && prev.freelancer.id === freelancerId
           ? { ...prev, freelancer: { ...prev.freelancer, failed_login_attempts: 0, locked_until: null } }
           : prev
       );
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     }
   };
 
   const savePricingOverride = async (freelancerId, level) => {
     const price = Number(overrideDraft[level]);
     if (!Number.isFinite(price) || price <= 0) {
-      alert('السعر يجب أن يكون رقماً موجباً');
+      alert(t('priceMustBePositive'));
       return;
     }
     try {
@@ -319,7 +324,7 @@ export default function AdminFreelancersPage() {
         body: JSON.stringify({ level, price }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setFreelancerDetail((prev) => {
         if (!prev) return prev;
         const others = prev.pricingOverrides.filter((o) => o.level !== level);
@@ -327,7 +332,7 @@ export default function AdminFreelancersPage() {
       });
       setOverrideDraft((prev) => ({ ...prev, [level]: '' }));
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     }
   };
 
@@ -338,12 +343,12 @@ export default function AdminFreelancersPage() {
         { method: 'DELETE' }
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setFreelancerDetail((prev) =>
         prev ? { ...prev, pricingOverrides: prev.pricingOverrides.filter((o) => o.level !== level) } : prev
       );
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     }
   };
 
@@ -351,7 +356,7 @@ export default function AdminFreelancersPage() {
     const current = levelPricing.find((lp) => lp.level === level);
     const price = Number(levelPriceDraft[level] ?? current?.price);
     if (!Number.isFinite(price) || price <= 0) {
-      alert('السعر يجب أن يكون رقماً موجباً');
+      alert(t('priceMustBePositive'));
       return;
     }
     try {
@@ -361,35 +366,35 @@ export default function AdminFreelancersPage() {
         body: JSON.stringify({ level, price }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setLevelPricing((prev) => prev.map((lp) => (lp.level === level ? { ...lp, price } : lp)));
       setLevelPriceDraft((prev) => ({ ...prev, [level]: '' }));
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     }
   };
 
   return (
     <div className="page">
-      <a href="/admin" className="back-link">← الإدارة</a>
-      <Header sub="إدارة المدربين المستقلين" />
+      <a href="/admin" className="back-link">← {t('backToManagement')}</a>
+      <Header sub={t('manageFreelancersSub')} />
       {error && <div className="msg error">{error}</div>}
 
       <div className="card">
-        <div style={{ fontWeight: 'bold', marginBottom: 12 }}>إضافة مدرب جديد</div>
+        <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('addNewFreelancer')}</div>
         {freelancerFormError && <div className="msg error">{freelancerFormError}</div>}
         <form onSubmit={addFreelancer}>
           <div className="field">
-            <label>الاسم</label>
+            <label>{t('nameLabel')}</label>
             <input
               type="text"
               value={freelancerForm.name}
               onChange={(e) => setFreelancerForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="اسم المدرب"
+              placeholder={t('nameLabel')}
             />
           </div>
           <div className="field">
-            <label>رقم الجوال</label>
+            <label>{t('phoneLabel')}</label>
             <input
               type="tel"
               value={freelancerForm.phone}
@@ -398,7 +403,7 @@ export default function AdminFreelancersPage() {
             />
           </div>
           <div className="field">
-            <label>الرمز (PIN)</label>
+            <label>{t('pinLabel')}</label>
             <input
               type="password"
               inputMode="numeric"
@@ -409,14 +414,14 @@ export default function AdminFreelancersPage() {
             />
           </div>
           <button className="btn" type="submit" disabled={savingFreelancer}>
-            {savingFreelancer ? 'جاري الإضافة...' : 'إضافة المدرب'}
+            {savingFreelancer ? t('adding') : t('addNewFreelancer')}
           </button>
         </form>
       </div>
 
-      <div style={{ fontWeight: 'bold', margin: '18px 0 10px' }}>المدربون ({freelancers.length})</div>
-      {loading && <div className="empty">جاري التحميل...</div>}
-      {!loading && freelancers.length === 0 && <div className="empty">ما في مدربين مسجلين بعد</div>}
+      <div style={{ fontWeight: 'bold', margin: '18px 0 10px' }}>{t('freelancersCount', { count: freelancers.length })}</div>
+      {loading && <div className="empty">{tc('loading')}</div>}
+      {!loading && freelancers.length === 0 && <div className="empty">{t('noFreelancersYet')}</div>}
 
       {!loading &&
         freelancers.map((f) => (
@@ -431,7 +436,7 @@ export default function AdminFreelancersPage() {
                 className={`status-pill ${f.is_active ? 'present' : 'absent'}`}
                 style={{ marginInlineEnd: 8 }}
               >
-                {f.is_active ? 'نشط' : 'معطّل'}
+                {f.is_active ? t('active') : t('disabled')}
               </span>
               <span style={{ fontWeight: 'bold', color: Number(f.current_balance) < 0 ? 'var(--absent)' : 'var(--text)' }}>
                 {Number(f.current_balance).toFixed(2)}
@@ -440,24 +445,24 @@ export default function AdminFreelancersPage() {
 
             {expandedFreelancerId === f.id && (
               <div className="card" style={{ marginTop: -4 }}>
-                {loadingDetail && <div className="empty">جاري التحميل...</div>}
+                {loadingDetail && <div className="empty">{tc('loading')}</div>}
 
                 {!loadingDetail && freelancerDetail && freelancerDetail.freelancer.id === f.id && (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>حالة الحساب</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{t('accountStatus')}</span>
                       <button
                         className="btn ghost"
                         type="button"
                         onClick={() => toggleActive(freelancerDetail.freelancer)}
                         style={{ width: 'auto', padding: '6px 12px', fontSize: 12 }}
                       >
-                        {freelancerDetail.freelancer.is_active ? 'تعطيل الحساب' : 'تفعيل الحساب'}
+                        {freelancerDetail.freelancer.is_active ? t('disableAccount') : t('enableAccount')}
                       </button>
                     </div>
 
                     <div className="field">
-                      <label>نوع الدفع</label>
+                      <label>{t('paymentTypeLabel')}</label>
                       <select
                         value={freelancerDetail.freelancer.payment_type}
                         onChange={(e) => changePaymentType(freelancerDetail.freelancer.id, e.target.value)}
@@ -470,7 +475,7 @@ export default function AdminFreelancersPage() {
 
                     {isLocked(freelancerDetail.freelancer.locked_until) && (
                       <div className="msg error">
-                        الحساب مقفول لحد {new Date(freelancerDetail.freelancer.locked_until).toLocaleString('ar-EG')}
+                        {t('accountLockedUntil', { until: new Date(freelancerDetail.freelancer.locked_until).toLocaleString(dateLocale) })}
                       </div>
                     )}
 
@@ -479,13 +484,13 @@ export default function AdminFreelancersPage() {
                       type="button"
                       onClick={() => resetPin(freelancerDetail.freelancer.id)}
                     >
-                      تصفير PIN
+                      {t('resetPin')}
                     </button>
                     <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, marginBottom: 16 }}>
-                      هذا الإجراء بيلغي قفل الحساب تلقائياً (لو كان مقفول)
+                      {t('resetPinAutoUnlocksNote')}
                     </div>
 
-                    <div style={{ fontWeight: 'bold', marginBottom: 8 }}>أسعار خاصة</div>
+                    <div style={{ fontWeight: 'bold', marginBottom: 8 }}>{t('specialPricing')}</div>
                     {levelPricing.map((lp) => {
                       const override = freelancerDetail.pricingOverrides.find((o) => o.level === lp.level);
                       return (
@@ -493,13 +498,13 @@ export default function AdminFreelancersPage() {
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 13 }}>{lp.level}</div>
                             <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                              افتراضي: {lp.price} درهم{override ? ` — خاص: ${override.price} درهم` : ''}
+                              {t('defaultPriceLine', { price: lp.price })}{override ? t('specialPriceSuffix', { price: override.price }) : ''}
                             </div>
                           </div>
                           <input
                             type="number"
                             min="0"
-                            placeholder="سعر خاص"
+                            placeholder={t('specialPricePlaceholder')}
                             value={overrideDraft[lp.level] ?? ''}
                             onChange={(e) => setOverrideDraft((prev) => ({ ...prev, [lp.level]: e.target.value }))}
                             style={{ width: 100, padding: '6px 8px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
@@ -510,7 +515,7 @@ export default function AdminFreelancersPage() {
                             onClick={() => savePricingOverride(freelancerDetail.freelancer.id, lp.level)}
                             style={{ width: 'auto', padding: '6px 10px', fontSize: 12 }}
                           >
-                            حفظ
+                            {t('save')}
                           </button>
                           {override && (
                             <button
@@ -519,14 +524,14 @@ export default function AdminFreelancersPage() {
                               onClick={() => deletePricingOverride(freelancerDetail.freelancer.id, lp.level)}
                               style={{ width: 'auto', padding: '6px 10px', fontSize: 12 }}
                             >
-                              حذف
+                              {tc('delete')}
                             </button>
                           )}
                         </div>
                       );
                     })}
 
-                    <div style={{ fontWeight: 'bold', margin: '18px 0 8px' }}>السجل المالي</div>
+                    <div style={{ fontWeight: 'bold', margin: '18px 0 8px' }}>{t('financialRecord')}</div>
 
                     <button
                       className="btn secondary"
@@ -534,25 +539,25 @@ export default function AdminFreelancersPage() {
                       onClick={() => setShowPaymentForm((v) => !v)}
                       style={{ marginBottom: 12 }}
                     >
-                      ➕ تسجيل دفعة
+                      {t('recordPayment')}
                     </button>
 
                     {showPaymentForm && (
                       <div className="card">
                         {paymentFormError && <div className="msg error">{paymentFormError}</div>}
                         <div className="field">
-                          <label>الاتجاه</label>
+                          <label>{t('directionLabel')}</label>
                           <select
                             value={paymentDirection}
                             onChange={(e) => setPaymentDirection(e.target.value)}
                           >
-                            <option value="">اختر الاتجاه</option>
-                            <option value="in">دفعة واردة من المدرب (تزيد رصيده)</option>
-                            <option value="out">دفعة صادرة له / تصحيح (تنقص رصيده)</option>
+                            <option value="">{t('selectDirection')}</option>
+                            <option value="in">{t('paymentIn')}</option>
+                            <option value="out">{t('paymentOut')}</option>
                           </select>
                         </div>
                         <div className="field">
-                          <label>المبلغ</label>
+                          <label>{t('amountLabel')}</label>
                           <input
                             type="number"
                             min="0"
@@ -562,12 +567,12 @@ export default function AdminFreelancersPage() {
                           />
                         </div>
                         <div className="field">
-                          <label>الملاحظة</label>
+                          <label>{t('noteLabel')}</label>
                           <input
                             type="text"
                             value={paymentNote}
                             onChange={(e) => setPaymentNote(e.target.value)}
-                            placeholder="سبب الدفعة"
+                            placeholder={t('paymentNotePlaceholder')}
                           />
                         </div>
                         <button
@@ -576,14 +581,14 @@ export default function AdminFreelancersPage() {
                           onClick={() => savePayment(freelancerDetail.freelancer.id)}
                           disabled={savingPayment}
                         >
-                          {savingPayment ? 'جاري الحفظ...' : 'حفظ'}
+                          {savingPayment ? t('saving') : t('save')}
                         </button>
                       </div>
                     )}
 
-                    {!freelancerLedger && <div className="empty">جاري التحميل...</div>}
+                    {!freelancerLedger && <div className="empty">{tc('loading')}</div>}
                     {freelancerLedger && freelancerLedger.entries.length === 0 && (
-                      <div className="empty">ما في حركات بعد</div>
+                      <div className="empty">{t('noEntriesYet')}</div>
                     )}
                     {freelancerLedger && freelancerLedger.entries.length > 0 && (() => {
                       const reversedIds = new Set(
@@ -597,7 +602,7 @@ export default function AdminFreelancersPage() {
                             <div>
                               <div style={{ fontWeight: 'bold' }}>{ENTRY_TYPE_LABELS[entry.entry_type] || entry.entry_type}</div>
                               <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                                {new Date(entry.created_at).toLocaleString('ar-EG', {
+                                {new Date(entry.created_at).toLocaleString(dateLocale, {
                                   day: 'numeric',
                                   month: 'long',
                                   year: 'numeric',
@@ -618,7 +623,7 @@ export default function AdminFreelancersPage() {
                           </div>
 
                           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
-                            الرصيد بعد الحركة: {Number(entry.balance_after).toFixed(2)}
+                            {t('balanceAfterEntry', { balance: Number(entry.balance_after).toFixed(2) })}
                           </div>
 
                           {entry.note && (
@@ -632,7 +637,7 @@ export default function AdminFreelancersPage() {
                               onClick={() => reverseEntry(freelancerDetail.freelancer.id, entry)}
                               style={{ width: 'auto', padding: '6px 10px', fontSize: 12, marginTop: 8 }}
                             >
-                              عكس
+                              {t('reverse')}
                             </button>
                           )}
                         </div>
@@ -645,7 +650,7 @@ export default function AdminFreelancersPage() {
           </div>
         ))}
 
-      <div style={{ fontWeight: 'bold', margin: '22px 0 10px' }}>الأسعار الافتراضية للمستويات</div>
+      <div style={{ fontWeight: 'bold', margin: '22px 0 10px' }}>{t('defaultLevelPrices')}</div>
       {levelPricing.map((lp) => (
         <div className="card" key={lp.level}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -664,7 +669,7 @@ export default function AdminFreelancersPage() {
                 onClick={() => saveLevelPrice(lp.level)}
                 style={{ width: 'auto', padding: '6px 12px', fontSize: 12 }}
               >
-                حفظ
+                {t('save')}
               </button>
             </div>
           </div>

@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Header from '../Header';
+import { useLocale, useTranslations } from '@/lib/locale/LocaleContext';
 
+// Seed-data content (activity names/schedules) — database content, never
+// translated, matches whatever the admin would type in themselves.
 const DEFAULT_ACTIVITIES = [
   {
     name: 'السباحة',
@@ -70,35 +73,34 @@ function hasMissingData(c) {
   return REQUIRED_NULLABLE_FIELDS.some((f) => c[f] === null || c[f] === undefined || c[f] === '');
 }
 
-function formatDate(d) {
+function formatDate(d, dateLocale) {
   if (!d) return null;
-  return new Date(d).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+  return new Date(d).toLocaleDateString(dateLocale, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-function genderLabel(g) {
-  if (g === 'male') return 'ذكر';
-  if (g === 'female') return 'أنثى';
-  return null;
-}
-
-function BoolBadge({ value }) {
-  if (value === true) return <span className="status-pill present">نعم</span>;
-  if (value === false) return <span className="status-pill absent">لا</span>;
+function BoolBadge({ value, yesLabel, noLabel, notAskedLabel }) {
+  if (value === true) return <span className="status-pill present">{yesLabel}</span>;
+  if (value === false) return <span className="status-pill absent">{noLabel}</span>;
   return (
     <span className="status-pill" style={{ background: 'rgba(234,179,8,0.18)', color: '#b45309' }}>
-      ⚠️ لم يُسأل بعد
+      ⚠️ {notAskedLabel}
     </span>
   );
 }
 
-function MissingField({ value, children }) {
+function MissingField({ value, missingLabel, children }) {
   if (value === null || value === undefined || value === '') {
-    return <span style={{ color: '#b45309' }}>⚠️ بيانات ناقصة</span>;
+    return <span style={{ color: '#b45309' }}>⚠️ {missingLabel}</span>;
   }
   return children;
 }
 
 export default function AdminPage() {
+  const { locale } = useLocale();
+  const t = useTranslations('admin');
+  const tc = useTranslations('common');
+  const dateLocale = locale === 'en' ? 'en-US' : 'ar-EG';
+
   const [activities, setActivities] = useState([]);
   const [children, setChildren] = useState([]);
   const [instructors, setInstructors] = useState([]);
@@ -171,7 +173,7 @@ export default function AdminPage() {
     try {
       const res = await fetch('/api/admin/freelancer-sessions?status=pending', { cache: 'no-store' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setPendingSessions(data.sessions);
 
       const [detailEntries, levelPricingData] = await Promise.all([
@@ -184,8 +186,8 @@ export default function AdminPage() {
               .then(async ([sessionRes, freelancerRes]) => {
                 const sessionData = await sessionRes.json();
                 const freelancerData = await freelancerRes.json();
-                if (!sessionRes.ok) throw new Error(sessionData.error || 'صار خطأ');
-                if (!freelancerRes.ok) throw new Error(freelancerData.error || 'صار خطأ');
+                if (!sessionRes.ok) throw new Error(sessionData.error || tc('error'));
+                if (!freelancerRes.ok) throw new Error(freelancerData.error || tc('error'));
                 return [s.id, { levelCounts: sessionData.levelCounts, pricingOverrides: freelancerData.pricingOverrides }];
               })
               .catch(() => [s.id, { error: true }])
@@ -210,7 +212,7 @@ export default function AdminPage() {
     e.preventDefault();
     setError('');
     if (!activityForm.name.trim()) {
-      setError('اسم النشاط مطلوب');
+      setError(t('activityNameRequired'));
       return;
     }
     setSavingActivity(true);
@@ -235,10 +237,10 @@ export default function AdminPage() {
     const existingNames = new Set(activities.map((a) => a.name));
     const toCreate = DEFAULT_ACTIVITIES.filter((a) => !existingNames.has(a.name));
     if (toCreate.length === 0) {
-      alert('كل الأنشطة السبعة موجودة أصلاً.');
+      alert(t('allActivitiesExist'));
       return;
     }
-    if (!window.confirm(`رح تنضاف ${toCreate.length} أنشطة (مع باقاتها) دفعة وحدة. أكمل؟`)) return;
+    if (!window.confirm(t('confirmSeedActivities', { count: toCreate.length }))) return;
 
     setSeeding(true);
     try {
@@ -250,7 +252,7 @@ export default function AdminPage() {
         });
         const data = await res.json();
         if (!res.ok) {
-          alert(`صار خطأ بإضافة "${def.name}": ${data.error}`);
+          alert(t('addActivityFailed', { name: def.name, error: data.error }));
           continue;
         }
         for (const pkg of def.packages) {
@@ -268,11 +270,11 @@ export default function AdminPage() {
   };
 
   const deleteActivity = async (activity) => {
-    if (!window.confirm(`حذف "${activity.name}"؟ رح ينحذف معه ${activity.enrolled_count} اشتراك وسجلات الحضور المرتبطة فيه.`)) return;
+    if (!window.confirm(t('deleteConfirmActivity', { name: activity.name, count: activity.enrolled_count }))) return;
     const res = await fetch(`/api/activities/${activity.id}`, { method: 'DELETE' });
     const data = await res.json();
     if (!res.ok) {
-      alert('صار خطأ: ' + data.error);
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
       return;
     }
     load();
@@ -287,10 +289,10 @@ export default function AdminPage() {
         body: JSON.stringify({ instructorId }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setActivities((prev) => prev.map((a) => (a.id === activityId ? { ...a, instructor_id: instructorId } : a)));
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     }
   };
 
@@ -307,15 +309,15 @@ export default function AdminPage() {
     const price = Number(draft.price);
     const sessionsPerWeek = draft.sessionsPerWeek ? Number(draft.sessionsPerWeek) : null;
     if (!sessionCount || sessionCount <= 0) {
-      alert('عدد الحصص مطلوب');
+      alert(t('sessionCountRequired'));
       return;
     }
     if (Number.isNaN(price) || price < 0) {
-      alert('السعر مطلوب');
+      alert(t('priceRequired'));
       return;
     }
     if (sessionsPerWeek !== null && (Number.isNaN(sessionsPerWeek) || sessionsPerWeek <= 0)) {
-      alert('عدد الحصص الأسبوعية غير صحيح');
+      alert(t('sessionsPerWeekInvalid'));
       return;
     }
     const res = await fetch(`/api/activities/${activityId}/packages`, {
@@ -325,7 +327,7 @@ export default function AdminPage() {
     });
     const data = await res.json();
     if (!res.ok) {
-      alert('صار خطأ: ' + data.error);
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
       return;
     }
     setPackageDraft((prev) => ({ ...prev, [activityId]: { sessionCount: '', price: '', sessionsPerWeek: '' } }));
@@ -333,11 +335,11 @@ export default function AdminPage() {
   };
 
   const deletePackage = async (pkg) => {
-    if (!window.confirm('حذف هالباقة؟')) return;
+    if (!window.confirm(t('deletePackageConfirm'))) return;
     const res = await fetch(`/api/packages/${pkg.id}`, { method: 'DELETE' });
     const data = await res.json();
     if (!res.ok) {
-      alert('صار خطأ: ' + data.error);
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
       return;
     }
     load();
@@ -370,7 +372,7 @@ export default function AdminPage() {
 
   const addOrRenewEnrollment = async (childId, activityId, packageId) => {
     if (!activityId || !packageId) {
-      alert('اختر النشاط والباقة');
+      alert(t('selectActivityAndPackage'));
       return;
     }
     const res = await fetch(`/api/children/${childId}/enrollments`, {
@@ -380,7 +382,7 @@ export default function AdminPage() {
     });
     const data = await res.json();
     if (!res.ok) {
-      alert('صار خطأ: ' + data.error);
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
       return;
     }
     setAddEnrollActivityId('');
@@ -394,7 +396,7 @@ export default function AdminPage() {
   const saveOffset = async (childId, activityId) => {
     const sessionsUsedOffset = Number(offsetDraft);
     if (Number.isNaN(sessionsUsedOffset) || sessionsUsedOffset < 0) {
-      alert('عدد الحصص غير صحيح');
+      alert(t('sessionsCountInvalid'));
       return;
     }
     const res = await fetch(`/api/children/${childId}/enrollments`, {
@@ -404,7 +406,7 @@ export default function AdminPage() {
     });
     const data = await res.json();
     if (!res.ok) {
-      alert('صار خطأ: ' + data.error);
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
       return;
     }
     setEditingOffsetActivityId(null);
@@ -447,7 +449,7 @@ export default function AdminPage() {
         body: JSON.stringify(infoDraft),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setEditingInfoChildId(null);
       setInfoDraft(null);
       load();
@@ -459,11 +461,11 @@ export default function AdminPage() {
   };
 
   const unenroll = async (childId, activityId) => {
-    if (!window.confirm('إلغاء الاشتراك بهالنشاط؟ رح تنحذف سجلات الحضور المرتبطة فيه.')) return;
+    if (!window.confirm(t('unenrollConfirm'))) return;
     const res = await fetch(`/api/children/${childId}/enrollments?activityId=${activityId}`, { method: 'DELETE' });
     const data = await res.json();
     if (!res.ok) {
-      alert('صار خطأ: ' + data.error);
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
       return;
     }
     loadEnrollments(childId);
@@ -471,9 +473,9 @@ export default function AdminPage() {
   };
 
   const resetAllData = async () => {
-    const typed = window.prompt('هاد الإجراء رح يمسح كل المتدربين والأنشطة والاشتراكات وسجلات الحضور نهائياً ومايمكن التراجع. للتأكيد، اكتب بالضبط: DELETE ALL');
+    const typed = window.prompt(t('resetAllConfirmPrompt'));
     if (typed !== 'DELETE ALL') {
-      if (typed !== null) alert('النص غير مطابق. تم الإلغاء.');
+      if (typed !== null) alert(t('resetAllTextMismatch'));
       return;
     }
     setResetting(true);
@@ -485,27 +487,25 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      alert('تم حذف كل البيانات بنجاح.');
+      alert(t('resetAllSuccess'));
       setExpandedChildId(null);
       setChildEnrollments([]);
       load();
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     } finally {
       setResetting(false);
     }
   };
 
   const resetFreelancerTestData = async () => {
-    const sure = window.confirm(
-      'هاد الإجراء رح يحذف نهائياً كل بيانات Freelancers التجريبية: المدربين، الجلسات، الحجوزات، الكشوفات المالية، والإشعارات — بدون رجعة.\n\nالأسعار الافتراضية والإعدادات العامة رح تضل موجودة.\n\nمتأكد بدك تكمل؟'
-    );
+    const sure = window.confirm(t('resetFreelancerConfirm'));
     if (!sure) return;
 
-    const resetPassword = window.prompt('أدخل كلمة مرور تصفير بيانات Freelancers للتأكيد:');
+    const resetPassword = window.prompt(t('resetFreelancerPasswordPrompt'));
     if (resetPassword === null) return;
     if (!resetPassword) {
-      alert('كلمة المرور مطلوبة. تم الإلغاء.');
+      alert(t('resetFreelancerPasswordRequired'));
       return;
     }
 
@@ -517,10 +517,10 @@ export default function AdminPage() {
         body: JSON.stringify({ resetPassword }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
-      alert('تم تصفير بيانات Freelancers التجريبية بنجاح.');
+      if (!res.ok) throw new Error(data.error || tc('error'));
+      alert(t('resetFreelancerSuccess'));
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     } finally {
       setResettingFreelancers(false);
     }
@@ -535,17 +535,17 @@ export default function AdminPage() {
         body: JSON.stringify({ status: 'approved' }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setPendingSessions((prev) => prev.filter((s) => s.id !== sessionId));
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     } finally {
       setProcessingSessionId(null);
     }
   };
 
   const rejectSession = async (sessionId) => {
-    const reason = window.prompt('اكتب سبب الرفض');
+    const reason = window.prompt(t('rejectReasonPrompt'));
     if (reason === null) return;
     const trimmedReason = reason.trim();
     if (!trimmedReason) return;
@@ -558,10 +558,10 @@ export default function AdminPage() {
         body: JSON.stringify({ status: 'rejected', rejectionReason: trimmedReason }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setPendingSessions((prev) => prev.filter((s) => s.id !== sessionId));
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     } finally {
       setProcessingSessionId(null);
     }
@@ -576,7 +576,7 @@ export default function AdminPage() {
     e.preventDefault();
     setPasswordError('');
     if (newPassword !== confirmPassword) {
-      setPasswordError('كلمة المرور الجديدة وتأكيدها مش متطابقين');
+      setPasswordError(t('passwordMismatch'));
       return;
     }
     setSavingPassword(true);
@@ -588,7 +588,7 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      alert('تم تغيير كلمة المرور بنجاح.');
+      alert(t('passwordChangedSuccess'));
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -612,7 +612,7 @@ export default function AdminPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      alert('تم تغيير كلمة مرور الموظف بنجاح.');
+      alert(t('staffPasswordChangedSuccess'));
       setStaffNewPassword('');
       setShowStaffPasswordForm(false);
     } catch (err) {
@@ -629,51 +629,51 @@ export default function AdminPage() {
   return (
     <div className="page">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <a href="/" className="back-link" style={{ marginBottom: 0 }}>← الرئيسية</a>
+        <a href="/" className="back-link" style={{ marginBottom: 0 }}>← {tc('backHome')}</a>
         <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
           <button
             type="button"
             onClick={() => setShowPasswordForm((v) => !v)}
             style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
           >
-            🔑 تغيير كلمة المرور
+            {t('changePasswordButton')}
           </button>
           <button
             type="button"
             onClick={() => setShowStaffPasswordForm((v) => !v)}
             style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
           >
-            🔑 كلمة مرور الموظف
+            {t('staffPasswordButton')}
           </button>
           <button
             type="button"
             onClick={logout}
             style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
           >
-            تسجيل الخروج ⏻
+            {t('logoutButton')}
           </button>
         </div>
       </div>
 
       {showPasswordForm && (
         <div className="card">
-          <div style={{ fontWeight: 'bold', marginBottom: 12 }}>تغيير كلمة المرور</div>
+          <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('changePasswordTitle')}</div>
           {passwordError && <div className="msg error">{passwordError}</div>}
           <form onSubmit={changePassword}>
             <div className="field">
-              <label>كلمة المرور الحالية</label>
+              <label>{t('currentPasswordLabel')}</label>
               <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
             </div>
             <div className="field">
-              <label>كلمة المرور الجديدة</label>
+              <label>{t('newPasswordLabel')}</label>
               <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
             </div>
             <div className="field">
-              <label>تأكيد كلمة المرور الجديدة</label>
+              <label>{t('confirmNewPasswordLabel')}</label>
               <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
             </div>
             <button className="btn" type="submit" disabled={savingPassword}>
-              {savingPassword ? 'جاري الحفظ...' : 'حفظ كلمة المرور الجديدة'}
+              {savingPassword ? t('saving') : t('saveNewPassword')}
             </button>
           </form>
         </div>
@@ -681,21 +681,21 @@ export default function AdminPage() {
 
       {showStaffPasswordForm && (
         <div className="card">
-          <div style={{ fontWeight: 'bold', marginBottom: 12 }}>كلمة مرور الموظف</div>
+          <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('staffPasswordTitle')}</div>
           {staffPasswordError && <div className="msg error">{staffPasswordError}</div>}
           <form onSubmit={changeStaffPassword}>
             <div className="field">
-              <label>كلمة المرور الجديدة</label>
+              <label>{t('newPasswordLabel')}</label>
               <input type="password" value={staffNewPassword} onChange={(e) => setStaffNewPassword(e.target.value)} />
             </div>
             <button className="btn" type="submit" disabled={savingStaffPassword}>
-              {savingStaffPassword ? 'جاري الحفظ...' : 'حفظ كلمة مرور الموظف'}
+              {savingStaffPassword ? t('saving') : t('saveStaffPassword')}
             </button>
           </form>
         </div>
       )}
 
-      <Header sub="إدارة الأنشطة والمتدربين" />
+      <Header sub={t('manageActivitiesTraineesSub')} />
 
       <button
         className="btn secondary"
@@ -704,25 +704,25 @@ export default function AdminPage() {
         disabled={seeding}
         style={{ marginBottom: 14 }}
       >
-        {seeding ? 'جاري التعبئة...' : '🚀 تعبئة الأنشطة السبعة تلقائياً (من الإعلان)'}
+        {seeding ? t('seedingActivities') : t('seedActivitiesButton')}
       </button>
 
       <div className="card">
-        <div style={{ fontWeight: 'bold', marginBottom: 12 }}>إضافة نشاط جديد</div>
+        <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('addNewActivity')}</div>
         {error && <div className="msg error">{error}</div>}
         <form onSubmit={addActivity}>
           <div style={{ display: 'flex', gap: 8 }}>
             <div className="field" style={{ flex: 1 }}>
-              <label>اسم النشاط</label>
+              <label>{t('activityNameLabel')}</label>
               <input
                 type="text"
                 value={activityForm.name}
                 onChange={(e) => setActivityForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="مثال: السباحة"
+                placeholder={t('activityNamePlaceholder')}
               />
             </div>
             <div className="field" style={{ width: 70 }}>
-              <label>إيموجي</label>
+              <label>{t('emojiLabel')}</label>
               <input
                 type="text"
                 value={activityForm.emoji}
@@ -737,40 +737,40 @@ export default function AdminPage() {
             onClick={() => setShowActivityDetails((v) => !v)}
             style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 13, padding: 0, marginBottom: 12, cursor: 'pointer' }}
           >
-            {showActivityDetails ? '− إخفاء التفاصيل الإضافية' : '+ تفاصيل إضافية (المدرب، المواعيد)'}
+            {showActivityDetails ? t('hideExtraDetails') : t('showExtraDetails')}
           </button>
 
           {showActivityDetails && (
             <>
               <div className="field">
-                <label>اسم المدرب/ة (اختياري)</label>
+                <label>{t('instructorNameOptionalLabel')}</label>
                 <input
                   type="text"
                   value={activityForm.instructorName}
                   onChange={(e) => setActivityForm((f) => ({ ...f, instructorName: e.target.value }))}
-                  placeholder="اسم المدرب"
+                  placeholder={t('instructorNamePlaceholder')}
                 />
               </div>
               <div className="field">
-                <label>المواعيد (اختياري)</label>
+                <label>{t('scheduleOptionalLabel')}</label>
                 <input
                   type="text"
                   value={activityForm.scheduleText}
                   onChange={(e) => setActivityForm((f) => ({ ...f, scheduleText: e.target.value }))}
-                  placeholder="مثال: السبت-الإثنين-الأربعاء 6-9 مساءً"
+                  placeholder={t('schedulePlaceholder')}
                 />
               </div>
             </>
           )}
 
           <button className="btn" type="submit" disabled={savingActivity}>
-            {savingActivity ? 'جاري الإضافة...' : 'إضافة النشاط'}
+            {savingActivity ? t('addingActivity') : t('addActivityButton')}
           </button>
         </form>
       </div>
 
-      <div style={{ fontWeight: 'bold', margin: '18px 0 10px' }}>الأنشطة ({activities.length})</div>
-      {activities.length === 0 && <div className="empty">لا يوجد أنشطة بعد</div>}
+      <div style={{ fontWeight: 'bold', margin: '18px 0 10px' }}>{t('activitiesCount', { count: activities.length })}</div>
+      {activities.length === 0 && <div className="empty">{t('noActivitiesYet')}</div>}
       {activities.map((a) => (
         <div className="card" key={a.id}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -781,25 +781,25 @@ export default function AdminPage() {
                 onChange={(e) => updateActivityInstructor(a.id, e.target.value ? Number(e.target.value) : null)}
                 style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
               >
-                <option value="">بدون مدرب محدد</option>
+                <option value="">{t('noInstructorAssigned')}</option>
                 {instructors.filter((i) => i.active).map((i) => (
                   <option key={i.id} value={i.id}>{i.name}</option>
                 ))}
               </select>
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{a.enrolled_count} مشترك</div>
+              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{t('enrolledCountLabel', { count: a.enrolled_count })}</div>
               {a.schedule_text && (
                 <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{a.schedule_text}</div>
               )}
             </div>
             <button className="btn ghost" type="button" onClick={() => deleteActivity(a)} style={{ width: 'auto', padding: '8px 12px', fontSize: 12 }}>
-              حذف
+              {tc('delete')}
             </button>
           </div>
 
           <div className="tabs" style={{ marginTop: 12, flexWrap: 'wrap' }}>
             {a.packages.map((p) => (
               <span className="tab" key={p.id}>
-                {p.session_count} حصص · {p.price} درهم{p.sessions_per_week ? ` · ${p.sessions_per_week}/أسبوع` : ''}{' '}
+                {p.session_count} · {p.price} {tc('currencyAed')}{p.sessions_per_week ? ` · ${p.sessions_per_week}/${locale === 'en' ? 'wk' : 'أسبوع'}` : ''}{' '}
                 <button
                   type="button"
                   onClick={() => deletePackage(p)}
@@ -815,7 +815,7 @@ export default function AdminPage() {
             <input
               type="number"
               min="1"
-              placeholder="عدد الحصص"
+              placeholder={t('sessionCountPlaceholder')}
               value={packageDraft[a.id]?.sessionCount || ''}
               onChange={(e) => updatePackageDraft(a.id, 'sessionCount', e.target.value)}
               style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
@@ -823,7 +823,7 @@ export default function AdminPage() {
             <input
               type="number"
               min="0"
-              placeholder="السعر (درهم)"
+              placeholder={t('pricePlaceholder')}
               value={packageDraft[a.id]?.price || ''}
               onChange={(e) => updatePackageDraft(a.id, 'price', e.target.value)}
               style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
@@ -831,20 +831,20 @@ export default function AdminPage() {
             <input
               type="number"
               min="1"
-              placeholder="حصص/أسبوع (اختياري)"
+              placeholder={t('sessionsPerWeekPlaceholder')}
               value={packageDraft[a.id]?.sessionsPerWeek || ''}
               onChange={(e) => updatePackageDraft(a.id, 'sessionsPerWeek', e.target.value)}
               style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
             />
             <button className="btn secondary" type="button" onClick={() => addPackage(a.id)} style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }}>
-              + باقة
+              {t('addPackageButton')}
             </button>
           </div>
         </div>
       ))}
 
       <button className="btn secondary" type="button" onClick={load} style={{ marginTop: 8 }}>
-        🔄 تحديث القوائم
+        {t('refreshLists')}
       </button>
       <button
         className="btn secondary"
@@ -853,13 +853,13 @@ export default function AdminPage() {
         disabled={resetting}
         style={{ marginTop: 8, marginInlineStart: 8, borderColor: 'var(--absent)', color: 'var(--absent)' }}
       >
-        {resetting ? 'جاري الحذف...' : '🗑️ حذف كل البيانات'}
+        {resetting ? t('deletingData') : t('deleteAllData')}
       </button>
 
       <div style={{ fontWeight: 'bold', margin: '22px 0 10px' }}>
-        المتدربين المسجلين ({children.length})
+        {t('traineesRegisteredCount', { count: children.length })}
       </div>
-      {children.length === 0 && <div className="empty">ما في متدربين مسجلين بعد</div>}
+      {children.length === 0 && <div className="empty">{t('noTraineesYet')}</div>}
       {children.map((c) => (
         <div key={c.id}>
           <div className="child-row" onClick={() => toggleExpand(c.id)} style={{ cursor: 'pointer' }}>
@@ -874,7 +874,7 @@ export default function AdminPage() {
                 className="status-pill"
                 style={{ background: 'rgba(234,179,8,0.18)', color: '#b45309', marginInlineStart: 8 }}
               >
-                ⚠️ بيانات ناقصة
+                ⚠️ {t('missingData')}
               </span>
             )}
             <a
@@ -891,7 +891,7 @@ export default function AdminPage() {
             <div className="card" style={{ marginTop: -4 }}>
               <div style={{ paddingBottom: 12, marginBottom: 12, borderBottom: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <div style={{ fontWeight: 'bold' }}>بيانات المتدرب</div>
+                  <div style={{ fontWeight: 'bold' }}>{t('traineeInfo')}</div>
                   {editingInfoChildId !== c.id && (
                     <button
                       className="btn ghost"
@@ -899,7 +899,7 @@ export default function AdminPage() {
                       onClick={() => startEditInfo(c)}
                       style={{ width: 'auto', padding: '6px 10px', fontSize: 11 }}
                     >
-                      تعديل البيانات
+                      {t('editInfo')}
                     </button>
                   )}
                 </div>
@@ -908,48 +908,48 @@ export default function AdminPage() {
                   <div>
                     {infoError && <div className="msg error">{infoError}</div>}
                     <div className="field">
-                      <label>اسم المتدرب الكامل</label>
+                      <label>{t('fullNameLabel')}</label>
                       <input type="text" value={infoDraft.fullName} onChange={(e) => setInfoDraft((d) => ({ ...d, fullName: e.target.value }))} />
                     </div>
                     <div className="field">
-                      <label>تاريخ الميلاد</label>
+                      <label>{t('dobLabel')}</label>
                       <input type="date" value={infoDraft.dateOfBirth} onChange={(e) => setInfoDraft((d) => ({ ...d, dateOfBirth: e.target.value }))} />
                     </div>
                     <div className="field">
-                      <label>الجنسية</label>
+                      <label>{t('nationalityLabel')}</label>
                       <input type="text" value={infoDraft.nationality} onChange={(e) => setInfoDraft((d) => ({ ...d, nationality: e.target.value }))} />
                     </div>
                     <div className="field">
-                      <label>الجنس</label>
+                      <label>{t('genderLabel')}</label>
                       <select value={infoDraft.gender} onChange={(e) => setInfoDraft((d) => ({ ...d, gender: e.target.value }))}>
-                        <option value="">اختر</option>
-                        <option value="male">ذكر</option>
-                        <option value="female">أنثى</option>
+                        <option value="">{t('genderSelect')}</option>
+                        <option value="male">{t('genderMale')}</option>
+                        <option value="female">{t('genderFemale')}</option>
                       </select>
                     </div>
                     <div className="field">
-                      <label>اسم ولي الأمر الكامل</label>
+                      <label>{t('parentFullNameLabel')}</label>
                       <input type="text" value={infoDraft.parentFullName} onChange={(e) => setInfoDraft((d) => ({ ...d, parentFullName: e.target.value }))} />
                     </div>
                     <div className="field">
-                      <label>صلة القرابة</label>
+                      <label>{t('relationshipLabel')}</label>
                       <input type="text" value={infoDraft.relationshipToChild} onChange={(e) => setInfoDraft((d) => ({ ...d, relationshipToChild: e.target.value }))} />
                     </div>
                     <div className="field">
-                      <label>رقم تواصل ولي الأمر</label>
+                      <label>{t('parentPhoneLabel')}</label>
                       <input type="tel" value={infoDraft.parentPhone} onChange={(e) => setInfoDraft((d) => ({ ...d, parentPhone: e.target.value }))} />
                     </div>
                     <div className="field">
-                      <label>البريد الإلكتروني</label>
+                      <label>{t('parentEmailLabel')}</label>
                       <input type="email" value={infoDraft.parentEmail} onChange={(e) => setInfoDraft((d) => ({ ...d, parentEmail: e.target.value }))} />
                     </div>
                     <div className="field">
-                      <label>العنوان (اختياري)</label>
+                      <label>{t('addressOptionalLabel')}</label>
                       <input type="text" value={infoDraft.address} onChange={(e) => setInfoDraft((d) => ({ ...d, address: e.target.value }))} />
                     </div>
 
                     <div className="field">
-                      <label>هل عند المتدرب حالة صحية يجب الانتباه لها؟</label>
+                      <label>{t('hasMedicalConditionLabel')}</label>
                       <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <input
@@ -958,7 +958,7 @@ export default function AdminPage() {
                             checked={infoDraft.hasMedicalCondition === true}
                             onChange={() => setInfoDraft((d) => ({ ...d, hasMedicalCondition: true }))}
                           />
-                          نعم
+                          {tc('yes')}
                         </label>
                         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <input
@@ -967,13 +967,13 @@ export default function AdminPage() {
                             checked={infoDraft.hasMedicalCondition === false}
                             onChange={() => setInfoDraft((d) => ({ ...d, hasMedicalCondition: false, medicalConditionDetails: '' }))}
                           />
-                          لا
+                          {tc('no')}
                         </label>
                       </div>
                     </div>
                     {infoDraft.hasMedicalCondition === true && (
                       <div className="field">
-                        <label>تفاصيل الحالة الصحية</label>
+                        <label>{t('medicalConditionDetailsLabel')}</label>
                         <input
                           type="text"
                           value={infoDraft.medicalConditionDetails}
@@ -983,7 +983,7 @@ export default function AdminPage() {
                     )}
 
                     <div className="field">
-                      <label>هل يتناول المتدرب أدوية بشكل منتظم؟</label>
+                      <label>{t('isOnMedicationLabel')}</label>
                       <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
                         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <input
@@ -992,7 +992,7 @@ export default function AdminPage() {
                             checked={infoDraft.isOnMedication === true}
                             onChange={() => setInfoDraft((d) => ({ ...d, isOnMedication: true }))}
                           />
-                          نعم
+                          {tc('yes')}
                         </label>
                         <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <input
@@ -1001,13 +1001,13 @@ export default function AdminPage() {
                             checked={infoDraft.isOnMedication === false}
                             onChange={() => setInfoDraft((d) => ({ ...d, isOnMedication: false, medicationDetails: '' }))}
                           />
-                          لا
+                          {tc('no')}
                         </label>
                       </div>
                     </div>
                     {infoDraft.isOnMedication === true && (
                       <div className="field">
-                        <label>تفاصيل الأدوية</label>
+                        <label>{t('medicationDetailsLabel')}</label>
                         <input
                           type="text"
                           value={infoDraft.medicationDetails}
@@ -1017,47 +1017,47 @@ export default function AdminPage() {
                     )}
 
                     <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                      <button className="btn secondary" type="button" onClick={cancelEditInfo} style={{ flex: 1 }}>إلغاء</button>
+                      <button className="btn secondary" type="button" onClick={cancelEditInfo} style={{ flex: 1 }}>{tc('cancel')}</button>
                       <button className="btn" type="button" onClick={() => saveInfo(c.id)} disabled={savingInfo} style={{ flex: 1 }}>
-                        {savingInfo ? 'جاري الحفظ...' : 'حفظ'}
+                        {savingInfo ? t('saving') : t('save')}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div>تاريخ الميلاد: <MissingField value={c.date_of_birth}>{formatDate(c.date_of_birth)}</MissingField></div>
-                    <div>الجنسية: <MissingField value={c.nationality}>{c.nationality}</MissingField></div>
-                    <div>الجنس: <MissingField value={c.gender}>{genderLabel(c.gender)}</MissingField></div>
-                    <div>ولي الأمر: <MissingField value={c.parent_full_name}>{c.parent_full_name}</MissingField></div>
-                    <div>صلة القرابة: <MissingField value={c.relationship_to_child}>{c.relationship_to_child}</MissingField></div>
-                    <div>هاتف ولي الأمر: {c.parent_phone}</div>
-                    <div>البريد الإلكتروني: <MissingField value={c.parent_email}>{c.parent_email}</MissingField></div>
-                    <div>العنوان: {c.address || '—'}</div>
+                    <div>{t('dobDisplayLabel')} <MissingField value={c.date_of_birth} missingLabel={t('missingData')}>{formatDate(c.date_of_birth, dateLocale)}</MissingField></div>
+                    <div>{t('nationalityDisplayLabel')} <MissingField value={c.nationality} missingLabel={t('missingData')}>{c.nationality}</MissingField></div>
+                    <div>{t('genderDisplayLabel')} <MissingField value={c.gender} missingLabel={t('missingData')}>{c.gender === 'male' ? t('genderMale') : c.gender === 'female' ? t('genderFemale') : null}</MissingField></div>
+                    <div>{t('parentDisplayLabel')} <MissingField value={c.parent_full_name} missingLabel={t('missingData')}>{c.parent_full_name}</MissingField></div>
+                    <div>{t('relationshipDisplayLabel')} <MissingField value={c.relationship_to_child} missingLabel={t('missingData')}>{c.relationship_to_child}</MissingField></div>
+                    <div>{t('parentPhoneDisplayLabel')} {c.parent_phone}</div>
+                    <div>{t('parentEmailDisplayLabel')} <MissingField value={c.parent_email} missingLabel={t('missingData')}>{c.parent_email}</MissingField></div>
+                    <div>{t('addressDisplayLabel')} {c.address || '—'}</div>
                     <div style={{ marginTop: 4, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <span>حالة صحية؟</span> <BoolBadge value={c.has_medical_condition} />
+                        <span>{t('hasMedicalConditionQuestion')}</span> <BoolBadge value={c.has_medical_condition} yesLabel={tc('yes')} noLabel={tc('no')} notAskedLabel={t('notAskedYet')} />
                       </div>
                       {c.has_medical_condition && <div style={{ color: 'var(--text-dim)' }}>{c.medical_condition_details}</div>}
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, marginBottom: 4 }}>
-                        <span>يتناول أدوية؟</span> <BoolBadge value={c.is_on_medication} />
+                        <span>{t('isOnMedicationQuestion')}</span> <BoolBadge value={c.is_on_medication} yesLabel={tc('yes')} noLabel={tc('no')} notAskedLabel={t('notAskedYet')} />
                       </div>
                       {c.is_on_medication && <div style={{ color: 'var(--text-dim)' }}>{c.medication_details}</div>}
                     </div>
                     <div style={{ marginTop: 4, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                        <span>موافقة الشروط والأحكام؟</span> <BoolBadge value={c.consent_terms_accepted} />
+                        <span>{t('consentTermsQuestion')}</span> <BoolBadge value={c.consent_terms_accepted} yesLabel={tc('yes')} noLabel={tc('no')} notAskedLabel={t('notAskedYet')} />
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <span>موافقة استخدام الصور تسويقياً؟</span> <BoolBadge value={c.consent_marketing_photos} />
+                        <span>{t('consentMarketingQuestion')}</span> <BoolBadge value={c.consent_marketing_photos} yesLabel={tc('yes')} noLabel={tc('no')} notAskedLabel={t('notAskedYet')} />
                       </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {loadingEnrollments && <div className="empty">جاري التحميل...</div>}
+              {loadingEnrollments && <div className="empty">{tc('loading')}</div>}
               {!loadingEnrollments && childEnrollments.length === 0 && (
-                <div className="empty">ما في اشتراكات بأنشطة بعد</div>
+                <div className="empty">{t('noEnrollmentsYet')}</div>
               )}
               {!loadingEnrollments && childEnrollments.map((e) => {
                 const activity = activities.find((a) => a.id === e.activity_id);
@@ -1068,16 +1068,16 @@ export default function AdminPage() {
                       <div>
                         <div style={{ fontWeight: 'bold' }}>{e.emoji ? `${e.emoji} ` : ''}{e.activity_name}</div>
                         <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                          {e.sessions_used}/{e.sessions_total} حصة
-                          {e.price_paid != null ? ` — ${e.price_paid} درهم` : ''}
-                          {e.expiry_date ? ` — ينتهي ${formatDate(e.expiry_date)}` : ''}
+                          {t('sessionsCountLine', { used: e.sessions_used, total: e.sessions_total })}
+                          {e.price_paid != null ? ` — ${e.price_paid} ${tc('currencyAed')}` : ''}
+                          {e.expiry_date ? ` — ${t('expiresOn', { date: formatDate(e.expiry_date, dateLocale) })}` : ''}
                         </div>
                       </div>
                       <span
                         className={`status-pill ${e.date_expired || e.sessions_remaining <= 0 ? 'absent' : 'present'}`}
                         style={{ marginInlineStart: 'auto', marginInlineEnd: 8 }}
                       >
-                        {e.date_expired ? 'خلصت المدة' : e.sessions_remaining > 0 ? `متبقي ${e.sessions_remaining}` : 'خلصت الحصص'}
+                        {e.date_expired ? t('timeExpiredStatus') : e.sessions_remaining > 0 ? t('remainingStatus', { count: e.sessions_remaining }) : t('sessionsExpiredStatus')}
                       </span>
                       <button
                         className="btn ghost"
@@ -1088,7 +1088,7 @@ export default function AdminPage() {
                         }}
                         style={{ width: 'auto', padding: '6px 10px', fontSize: 11 }}
                       >
-                        تجديد
+                        {t('renewButton')}
                       </button>
                       <button
                         className="btn ghost"
@@ -1100,10 +1100,10 @@ export default function AdminPage() {
                         }}
                         style={{ width: 'auto', padding: '6px 10px', fontSize: 11, marginInlineStart: 6 }}
                       >
-                        تفقد يدوي
+                        {t('manualCheckButton')}
                       </button>
                       <button className="btn ghost" type="button" onClick={() => unenroll(c.id, e.activity_id)} style={{ width: 'auto', padding: '6px 10px', fontSize: 11, marginInlineStart: 6 }}>
-                        إلغاء
+                        {t('unenrollButton')}
                       </button>
                     </div>
                     {renewingActivityId === e.activity_id && (
@@ -1113,9 +1113,9 @@ export default function AdminPage() {
                           onChange={(ev) => setRenewPackageId(ev.target.value)}
                           style={{ flex: 1 }}
                         >
-                          <option value="">اختر باقة التجديد</option>
+                          <option value="">{t('selectRenewPackage')}</option>
                           {packages.map((p) => (
-                            <option key={p.id} value={p.id}>{p.session_count} حصص — {p.price} درهم</option>
+                            <option key={p.id} value={p.id}>{p.session_count} — {p.price} {tc('currencyAed')}</option>
                           ))}
                         </select>
                         <button
@@ -1124,14 +1124,14 @@ export default function AdminPage() {
                           onClick={() => addOrRenewEnrollment(c.id, e.activity_id, renewPackageId)}
                           style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }}
                         >
-                          تأكيد
+                          {t('confirmButton')}
                         </button>
                       </div>
                     )}
                     {editingOffsetActivityId === e.activity_id && (
                       <div style={{ marginTop: 8 }}>
                         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>
-                          عدد الحصص يلي حضرها المتدرب يدوياً (تفقد ورقي) قبل استخدام النظام — بتنضاف على أي حصص متسجّلة عبر مسح QR
+                          {t('manualOffsetNote')}
                         </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <input
@@ -1147,7 +1147,7 @@ export default function AdminPage() {
                             onClick={() => saveOffset(c.id, e.activity_id)}
                             style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }}
                           >
-                            حفظ
+                            {t('save')}
                           </button>
                         </div>
                       </div>
@@ -1158,14 +1158,14 @@ export default function AdminPage() {
 
               {availableForEnroll.length > 0 && (
                 <div style={{ marginTop: 12 }}>
-                  <div style={{ fontSize: 13, marginBottom: 6, color: 'var(--text-dim)' }}>إضافة اشتراك بنشاط جديد</div>
+                  <div style={{ fontSize: 13, marginBottom: 6, color: 'var(--text-dim)' }}>{t('addEnrollmentNewActivity')}</div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     <select
                       value={addEnrollActivityId}
                       onChange={(e) => { setAddEnrollActivityId(e.target.value); setAddEnrollPackageId(''); }}
                       style={{ flex: 1, minWidth: 120 }}
                     >
-                      <option value="">اختر النشاط</option>
+                      <option value="">{t('selectActivity')}</option>
                       {availableForEnroll.map((a) => (
                         <option key={a.id} value={a.id}>{a.name}</option>
                       ))}
@@ -1176,9 +1176,9 @@ export default function AdminPage() {
                       disabled={!addEnrollActivityId}
                       style={{ flex: 1, minWidth: 120 }}
                     >
-                      <option value="">اختر الباقة</option>
+                      <option value="">{t('selectPackage')}</option>
                       {packagesForSelectedActivity.map((p) => (
-                        <option key={p.id} value={p.id}>{p.session_count} حصص — {p.price} درهم</option>
+                        <option key={p.id} value={p.id}>{p.session_count} — {p.price} {tc('currencyAed')}</option>
                       ))}
                     </select>
                     <button
@@ -1187,7 +1187,7 @@ export default function AdminPage() {
                       onClick={() => addOrRenewEnrollment(c.id, addEnrollActivityId, addEnrollPackageId)}
                       style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }}
                     >
-                      اشتراك
+                      {t('subscribeButton')}
                     </button>
                   </div>
                 </div>
@@ -1198,30 +1198,30 @@ export default function AdminPage() {
       ))}
 
       <a href="/admin/freelancers" className="btn" style={{ display: 'flex', marginTop: 22 }}>
-        🏊 إدارة الفريلانسرز
+        {t('manageFreelancersLink')}
       </a>
 
       <a href="/admin/instructors" className="btn" style={{ display: 'flex', marginTop: 12 }}>
-        👥 إدارة المدربين
+        {t('manageInstructorsLink')}
       </a>
 
       <div className="card" style={{ marginTop: 14 }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 12 }}>طلبات الفريلانسرز</div>
+        <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('freelancerRequests')}</div>
 
         {pendingSessionsError && <div className="msg error">{pendingSessionsError}</div>}
-        {loadingPendingSessions && <div className="empty">جاري التحميل...</div>}
+        {loadingPendingSessions && <div className="empty">{tc('loading')}</div>}
         {!loadingPendingSessions && !pendingSessionsError && pendingSessions.length === 0 && (
-          <div className="empty">لا يوجد طلبات معلّقة حالياً</div>
+          <div className="empty">{t('noPendingRequests')}</div>
         )}
 
         {!loadingPendingSessions && pendingSessions.map((s) => (
           <div key={s.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
             <div style={{ fontWeight: 'bold' }}>{s.freelancer_name}</div>
             <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-              {new Date(s.session_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })} — {s.session_time.slice(0, 5)}
+              {new Date(s.session_date).toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' })} — {s.session_time.slice(0, 5)}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4, marginBottom: 8 }}>
-              {pendingSessionDetails[s.id]?.error && 'ما قدرنا نجيب التفاصيل'}
+              {pendingSessionDetails[s.id]?.error && t('couldntFetchDetails')}
               {pendingSessionDetails[s.id]?.levelCounts && (() => {
                 const detail = pendingSessionDetails[s.id];
                 let total = 0;
@@ -1232,7 +1232,7 @@ export default function AdminPage() {
                     incomplete = true;
                     return (
                       <div key={lc.level} style={{ color: 'var(--absent)', fontWeight: 'bold' }}>
-                        {lc.level}: {lc.child_count} أطفال — ⚠️ ما في سعر مُعرّف لهالمستوى — الإغلاق رح يفشل
+                        {t('noPriceForLevel', { level: lc.level, count: lc.child_count })}
                       </div>
                     );
                   }
@@ -1240,7 +1240,7 @@ export default function AdminPage() {
                   total += subtotal;
                   return (
                     <div key={lc.level}>
-                      {lc.level}: {lc.child_count} أطفال × {price} درهم = {subtotal} درهم
+                      {t('levelCostLine', { level: lc.level, count: lc.child_count, price, subtotal })}
                     </div>
                   );
                 });
@@ -1248,7 +1248,7 @@ export default function AdminPage() {
                   <>
                     {rows}
                     <div style={{ fontWeight: 'bold', marginTop: 6, color: incomplete ? 'var(--absent)' : 'var(--text)' }}>
-                      {incomplete ? 'المجموع غير مكتمل، في مستوى بدون سعر' : `التكلفة المتوقعة الإجمالية: ${total} درهم`}
+                      {incomplete ? t('incompleteTotalWarning') : t('totalExpectedCost', { total })}
                     </div>
                   </>
                 );
@@ -1262,7 +1262,7 @@ export default function AdminPage() {
                 disabled={processingSessionId === s.id}
                 style={{ width: 'auto', padding: '8px 14px', fontSize: 13, borderColor: 'var(--present)', color: 'var(--present)' }}
               >
-                موافقة
+                {t('approveButton')}
               </button>
               <button
                 type="button"
@@ -1271,7 +1271,7 @@ export default function AdminPage() {
                 disabled={processingSessionId === s.id}
                 style={{ width: 'auto', padding: '8px 14px', fontSize: 13, borderColor: 'var(--absent)', color: 'var(--absent)' }}
               >
-                رفض
+                {t('rejectButton')}
               </button>
             </div>
           </div>
@@ -1279,9 +1279,9 @@ export default function AdminPage() {
       </div>
 
       <div className="card" style={{ marginTop: 22, borderColor: 'var(--absent)' }}>
-        <div style={{ fontWeight: 'bold', marginBottom: 8, color: 'var(--absent)' }}>⚠️ منطقة خطر — Freelancers</div>
+        <div style={{ fontWeight: 'bold', marginBottom: 8, color: 'var(--absent)' }}>{t('freelancerDangerZoneTitle')}</div>
         <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>
-          يحذف نهائيًا كل بيانات وحدة Freelancers التجريبية (المدربين، الجلسات، الحجوزات، الكشوفات المالية، الإشعارات). الأسعار الافتراضية والإعدادات العامة ما بتتأثر.
+          {t('freelancerDangerZoneDesc')}
         </div>
         <button
           className="btn secondary"
@@ -1290,7 +1290,7 @@ export default function AdminPage() {
           disabled={resettingFreelancers}
           style={{ borderColor: 'var(--absent)', color: 'var(--absent)' }}
         >
-          {resettingFreelancers ? 'جاري التصفير...' : 'تصفير بيانات Freelancers التجريبية'}
+          {resettingFreelancers ? t('resettingFreelancerData') : t('resetFreelancerDataButton')}
         </button>
       </div>
     </div>

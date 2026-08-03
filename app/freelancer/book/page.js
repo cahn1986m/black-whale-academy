@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Header from '../../Header';
+import { useTranslations } from '@/lib/locale/LocaleContext';
 
 const inputStyle = {
   width: '100%',
@@ -13,6 +14,8 @@ const inputStyle = {
 };
 
 export default function FreelancerBookSessionPage() {
+  const t = useTranslations('freelancer');
+  const tc = useTranslations('common');
   const [pricing, setPricing] = useState([]);
   const [pricingError, setPricingError] = useState('');
   const [sessionDate, setSessionDate] = useState('');
@@ -26,7 +29,7 @@ export default function FreelancerBookSessionPage() {
     fetch('/api/freelancer/pricing', { cache: 'no-store' })
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'صار خطأ');
+        if (!res.ok) throw new Error(data.error || tc('error'));
         setPricing(data.pricing);
       })
       .catch((err) => setPricingError(err.message));
@@ -50,7 +53,7 @@ export default function FreelancerBookSessionPage() {
     setSuccess('');
 
     if (!sessionDate || !sessionTime) {
-      setError('التاريخ والوقت مطلوبان');
+      setError(t('dateAndTimeRequired'));
       return;
     }
 
@@ -58,11 +61,11 @@ export default function FreelancerBookSessionPage() {
       const row = rows[i];
       const count = Number(row.count);
       if (!row.level) {
-        setError(`العنصر رقم ${i + 1}: المستوى مطلوب`);
+        setError(t('rowLevelRequired', { n: i + 1 }));
         return;
       }
       if (!Number.isInteger(count) || count <= 0) {
-        setError(`العنصر رقم ${i + 1}: عدد الأطفال يجب أن يكون رقماً صحيحاً موجباً`);
+        setError(t('rowCountInvalid', { n: i + 1 }));
         return;
       }
     }
@@ -79,8 +82,8 @@ export default function FreelancerBookSessionPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
-      setSuccess('تم إرسال طلب الحجز بنجاح');
+      if (!res.ok) throw new Error(data.error || tc('error'));
+      setSuccess(t('bookingSent'));
       window.location.href = `/freelancer/sessions/${data.sessionId}`;
     } catch (err) {
       setError(err.message);
@@ -91,7 +94,7 @@ export default function FreelancerBookSessionPage() {
 
   return (
     <div className="page">
-      <Header sub="حجز جلسة جديدة" />
+      <Header sub={t('bookSessionSub')} />
       {error && <div className="msg error">{error}</div>}
       {success && <div className="msg success">{success}</div>}
       {pricingError && <div className="msg error">{pricingError}</div>}
@@ -99,7 +102,7 @@ export default function FreelancerBookSessionPage() {
       <form onSubmit={submit}>
         <div className="card">
           <div className="field">
-            <label>التاريخ</label>
+            <label>{t('dateLabel')}</label>
             <input
               type="date"
               value={sessionDate}
@@ -108,7 +111,7 @@ export default function FreelancerBookSessionPage() {
             />
           </div>
           <div className="field" style={{ marginBottom: 0 }}>
-            <label>الوقت</label>
+            <label>{t('timeLabel')}</label>
             <input
               type="time"
               value={sessionTime}
@@ -120,17 +123,17 @@ export default function FreelancerBookSessionPage() {
 
         <div className="card">
           <label style={{ fontSize: 13, color: 'var(--text-dim)', display: 'block', marginBottom: 10 }}>
-            المستويات المطلوبة
+            {t('requiredLevels')}
           </label>
 
           {rows.map((row, index) => (
             <div key={index} style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
               <div className="field" style={{ flex: 2, marginBottom: 0 }}>
                 <select value={row.level} onChange={(e) => updateRow(index, 'level', e.target.value)}>
-                  <option value="">اختر المستوى</option>
+                  <option value="">{t('selectLevel')}</option>
                   {pricing.map((p) => (
                     <option key={p.level} value={p.level}>
-                      {p.level} — {p.price} درهم
+                      {p.level} — {p.price} {tc('currencyAed')}
                     </option>
                   ))}
                 </select>
@@ -140,7 +143,7 @@ export default function FreelancerBookSessionPage() {
                   type="number"
                   min="1"
                   step="1"
-                  placeholder="العدد"
+                  placeholder={t('countPlaceholder')}
                   value={row.count}
                   onChange={(e) => updateRow(index, 'count', e.target.value)}
                   style={inputStyle}
@@ -160,12 +163,12 @@ export default function FreelancerBookSessionPage() {
           ))}
 
           <button type="button" className="btn secondary" onClick={addRow}>
-            + إضافة مستوى
+            {t('addLevel')}
           </button>
         </div>
 
         <button className="btn" type="submit" disabled={submitting}>
-          {submitting ? 'جاري الإرسال...' : 'إرسال طلب الحجز'}
+          {submitting ? t('sending') : t('sendBookingRequest')}
         </button>
       </form>
     </div>

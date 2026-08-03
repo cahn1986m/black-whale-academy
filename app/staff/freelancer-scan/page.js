@@ -3,14 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '../../Header';
-
-const STATUS_LABELS = {
-  pending: 'بانتظار الموافقة',
-  approved: 'موافق عليها',
-  checked_in: 'جارية',
-  closed: 'مغلقة',
-  rejected: 'مرفوضة',
-};
+import { useTranslations } from '@/lib/locale/LocaleContext';
 
 // Same rgba-tint-plus-solid-color technique already used by
 // .status-pill.present/.absent in globals.css — reused verbatim from
@@ -33,6 +26,16 @@ function statusPillStyle(status) {
 }
 
 export default function StaffFreelancerScanListPage() {
+  const t = useTranslations('staff');
+  const tc = useTranslations('common');
+  const STATUS_LABELS = {
+    pending: t('statusPending'),
+    approved: t('statusApproved'),
+    checked_in: t('statusCheckedIn'),
+    closed: t('statusClosed'),
+    rejected: t('statusRejected'),
+  };
+
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -41,7 +44,7 @@ export default function StaffFreelancerScanListPage() {
     fetch('/api/admin/freelancer-sessions?status=approved,checked_in', { cache: 'no-store' })
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'صار خطأ');
+        if (!res.ok) throw new Error(data.error || tc('error'));
         setSessions(data.sessions);
       })
       .catch((err) => setError(err.message))
@@ -50,12 +53,12 @@ export default function StaffFreelancerScanListPage() {
 
   return (
     <div className="page">
-      <Header sub="مسح جلسات الفريلانسرز" />
+      <Header sub={t('freelancerScanSub')} />
       {error && <div className="msg error">{error}</div>}
 
-      {loading && <div className="empty">جاري التحميل...</div>}
+      {loading && <div className="empty">{tc('loading')}</div>}
 
-      {!loading && sessions.length === 0 && <div className="empty">ما في جلسات جاهزة للمسح حالياً</div>}
+      {!loading && sessions.length === 0 && <div className="empty">{t('noSessionsToScan')}</div>}
 
       {!loading &&
         sessions.map((s) => (

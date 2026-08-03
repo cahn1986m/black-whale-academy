@@ -3,8 +3,11 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '../Header';
+import { useTranslations } from '@/lib/locale/LocaleContext';
 
 export default function FreelancerHomePage() {
+  const t = useTranslations('freelancer');
+  const tc = useTranslations('common');
   const [freelancer, setFreelancer] = useState(null);
   const [balance, setBalance] = useState(null);
   const [pendingCount, setPendingCount] = useState(0);
@@ -15,7 +18,7 @@ export default function FreelancerHomePage() {
     const fetchJson = (url) =>
       fetch(url, { cache: 'no-store' }).then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'صار خطأ');
+        if (!res.ok) throw new Error(data.error || tc('error'));
         return data;
       });
 
@@ -38,20 +41,20 @@ export default function FreelancerHomePage() {
 
   return (
     <div className="page">
-      <Header sub="لوحة المدرب المستقل" />
+      <Header sub={t('dashboardSub')} />
       {error && <div className="msg error">{error}</div>}
 
-      {loading && !error && <div className="empty">جاري التحميل...</div>}
+      {loading && !error && <div className="empty">{tc('loading')}</div>}
 
       {!loading && !error && (
         <>
           <div className="card">
-            <p style={{ margin: 0 }}>مرحباً {freelancer?.name}</p>
+            <p style={{ margin: 0 }}>{t('welcome', { name: freelancer?.name })}</p>
           </div>
 
           <div className="card" style={isNegative ? { borderColor: 'var(--absent)' } : undefined}>
             <label style={{ fontSize: 13, color: 'var(--text-dim)', display: 'block', marginBottom: 6 }}>
-              الرصيد الحالي
+              {t('currentBalance')}
             </label>
             <p
               style={{
@@ -61,19 +64,19 @@ export default function FreelancerHomePage() {
                 color: isNegative ? 'var(--absent)' : 'var(--present)',
               }}
             >
-              {balanceNumber !== null ? balanceNumber.toFixed(2) : '—'} درهم
+              {balanceNumber !== null ? balanceNumber.toFixed(2) : '—'} {tc('currencyAed')}
             </p>
           </div>
 
           {pendingCount > 0 && (
             <Link href="/freelancer/sessions" className="summary-bar">
-              <span>جلسات بانتظار الموافقة</span>
+              <span>{t('pendingApprovalSessions')}</span>
               <span className="count">{pendingCount}</span>
             </Link>
           )}
 
           <Link href="/freelancer/book" className="btn" style={{ display: 'flex', marginBottom: 14 }}>
-            + حجز جلسة جديدة
+            {t('bookNewSession')}
           </Link>
         </>
       )}

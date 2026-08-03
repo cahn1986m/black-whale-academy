@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useTranslations } from '@/lib/locale/LocaleContext';
 
 export default function CopyLink({ path }) {
+  const t = useTranslations('common');
   const [url, setUrl] = useState('');
   const [copied, setCopied] = useState(false);
 
@@ -39,7 +41,7 @@ export default function CopyLink({ path }) {
         {url || '...'}
       </div>
       <button className="btn secondary" onClick={copy} type="button">
-        {copied ? 'تم النسخ ✓' : 'نسخ الرابط'}
+        {copied ? t('copied') : t('copyLink')}
       </button>
     </div>
   );

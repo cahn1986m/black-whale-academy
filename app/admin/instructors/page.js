@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import Header from '../../Header';
+import { useTranslations } from '@/lib/locale/LocaleContext';
 
 export default function AdminInstructorsPage() {
+  const t = useTranslations('admin');
+  const tc = useTranslations('common');
   const [instructors, setInstructors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,7 +43,7 @@ export default function AdminInstructorsPage() {
     try {
       const res = await fetch('/api/admin/instructors', { cache: 'no-store' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setInstructors(data.instructors);
     } catch (err) {
       setError(err.message);
@@ -61,7 +64,7 @@ export default function AdminInstructorsPage() {
     const payType = instructorForm.pay_type;
 
     if (!name) {
-      setInstructorFormError('اسم المدرب مطلوب');
+      setInstructorFormError(t('instructorNameRequired'));
       return;
     }
 
@@ -70,19 +73,19 @@ export default function AdminInstructorsPage() {
     if (payType === 'per_session') {
       const defaultRatePerDay = Number(instructorForm.default_rate_per_day);
       if (!Number.isFinite(defaultRatePerDay) || defaultRatePerDay <= 0) {
-        setInstructorFormError('سعر الحصة لازم يكون رقم أكبر من صفر');
+        setInstructorFormError(t('rateMustBePositive'));
         return;
       }
       body.default_rate_per_day = defaultRatePerDay;
     } else {
       const monthlySalary = Number(instructorForm.monthly_salary);
       if (!Number.isFinite(monthlySalary) || monthlySalary <= 0) {
-        setInstructorFormError('الراتب الشهري لازم يكون رقم أكبر من صفر');
+        setInstructorFormError(t('salaryMustBePositive'));
         return;
       }
       const monthlyAbsenceDeduction = Number(instructorForm.monthly_absence_deduction);
       if (!Number.isFinite(monthlyAbsenceDeduction) || monthlyAbsenceDeduction <= 0) {
-        setInstructorFormError('مبلغ خصم الغياب لازم يكون رقم أكبر من صفر');
+        setInstructorFormError(t('absenceDeductionMustBePositive'));
         return;
       }
       body.monthly_salary = monthlySalary;
@@ -97,7 +100,7 @@ export default function AdminInstructorsPage() {
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setInstructors((prev) =>
         [
           ...prev,
@@ -134,7 +137,7 @@ export default function AdminInstructorsPage() {
     try {
       const res = await fetch(`/api/admin/instructors/${instructorId}`, { cache: 'no-store' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setInstructorDetail({ instructor: data.instructor, linkedActivities: data.linkedActivities });
       setEditForm({
         name: data.instructor.name,
@@ -171,7 +174,7 @@ export default function AdminInstructorsPage() {
         body: JSON.stringify({ active: nextActive }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setInstructors((prev) => prev.map((i) => (i.id === instructor.id ? { ...i, active: nextActive } : i)));
       setInstructorDetail((prev) =>
         prev && prev.instructor.id === instructor.id
@@ -179,7 +182,7 @@ export default function AdminInstructorsPage() {
           : prev
       );
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     }
   };
 
@@ -189,7 +192,7 @@ export default function AdminInstructorsPage() {
     const payType = editForm.pay_type;
 
     if (!name) {
-      alert('اسم المدرب مطلوب');
+      alert(t('instructorNameRequired'));
       return;
     }
 
@@ -198,19 +201,19 @@ export default function AdminInstructorsPage() {
     if (payType === 'per_session') {
       const defaultRatePerDay = Number(editForm.default_rate_per_day);
       if (!Number.isFinite(defaultRatePerDay) || defaultRatePerDay <= 0) {
-        alert('سعر الحصة لازم يكون رقم أكبر من صفر');
+        alert(t('rateMustBePositive'));
         return;
       }
       body.default_rate_per_day = defaultRatePerDay;
     } else {
       const monthlySalary = Number(editForm.monthly_salary);
       if (!Number.isFinite(monthlySalary) || monthlySalary <= 0) {
-        alert('الراتب الشهري لازم يكون رقم أكبر من صفر');
+        alert(t('salaryMustBePositive'));
         return;
       }
       const monthlyAbsenceDeduction = Number(editForm.monthly_absence_deduction);
       if (!Number.isFinite(monthlyAbsenceDeduction) || monthlyAbsenceDeduction <= 0) {
-        alert('مبلغ خصم الغياب لازم يكون رقم أكبر من صفر');
+        alert(t('absenceDeductionMustBePositive'));
         return;
       }
       body.monthly_salary = monthlySalary;
@@ -225,7 +228,7 @@ export default function AdminInstructorsPage() {
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       const updatedFields = {
         name,
         contact,
@@ -245,7 +248,7 @@ export default function AdminInstructorsPage() {
           : prev
       );
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     } finally {
       setSavingEdit(false);
     }
@@ -256,11 +259,11 @@ export default function AdminInstructorsPage() {
     try {
       const res = await fetch(`/api/admin/instructors/${instructorId}/issue-salary`, { method: 'POST' });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
-      alert('تم إصدار الراتب بنجاح');
+      if (!res.ok) throw new Error(data.error || tc('error'));
+      alert(t('salaryIssuedSuccess'));
       loadInstructorDetail(instructorId);
     } catch (err) {
-      alert('صار خطأ: ' + err.message);
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     } finally {
       setIssuingSalary(false);
     }
@@ -268,45 +271,45 @@ export default function AdminInstructorsPage() {
 
   return (
     <div className="page">
-      <a href="/admin" className="back-link">← الإدارة</a>
-      <Header sub="إدارة المدربين" />
+      <a href="/admin" className="back-link">← {t('backToManagement')}</a>
+      <Header sub={t('manageInstructorsSub')} />
       {error && <div className="msg error">{error}</div>}
 
       <div className="card">
-        <div style={{ fontWeight: 'bold', marginBottom: 12 }}>إضافة مدرب جديد</div>
+        <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('addNewInstructor')}</div>
         {instructorFormError && <div className="msg error">{instructorFormError}</div>}
         <form onSubmit={addInstructor}>
           <div className="field">
-            <label>الاسم</label>
+            <label>{t('nameLabel')}</label>
             <input
               type="text"
               value={instructorForm.name}
               onChange={(e) => setInstructorForm((f) => ({ ...f, name: e.target.value }))}
-              placeholder="اسم المدرب"
+              placeholder={t('nameLabel')}
             />
           </div>
           <div className="field">
-            <label>معلومة تواصل (اختياري)</label>
+            <label>{t('contactOptionalLabel')}</label>
             <input
               type="text"
               value={instructorForm.contact}
               onChange={(e) => setInstructorForm((f) => ({ ...f, contact: e.target.value }))}
-              placeholder="رقم جوال أو إيميل"
+              placeholder={t('contactPlaceholder')}
             />
           </div>
           <div className="field">
-            <label>نوع الدفع</label>
+            <label>{t('payTypeLabel')}</label>
             <select
               value={instructorForm.pay_type}
               onChange={(e) => setInstructorForm((f) => ({ ...f, pay_type: e.target.value }))}
             >
-              <option value="per_session">بالحصة اليومية</option>
-              <option value="monthly">راتب شهري</option>
+              <option value="per_session">{t('payTypePerSession')}</option>
+              <option value="monthly">{t('payTypeMonthly')}</option>
             </select>
           </div>
           {instructorForm.pay_type === 'per_session' ? (
             <div className="field">
-              <label>سعر الحصة اليومية</label>
+              <label>{t('ratePerDayLabel')}</label>
               <input
                 type="number"
                 min="0"
@@ -318,7 +321,7 @@ export default function AdminInstructorsPage() {
           ) : (
             <>
               <div className="field">
-                <label>الراتب الشهري</label>
+                <label>{t('monthlySalaryLabel')}</label>
                 <input
                   type="number"
                   min="0"
@@ -328,7 +331,7 @@ export default function AdminInstructorsPage() {
                 />
               </div>
               <div className="field">
-                <label>مبلغ خصم الغياب اليومي</label>
+                <label>{t('monthlyAbsenceDeductionLabel')}</label>
                 <input
                   type="number"
                   min="0"
@@ -340,14 +343,14 @@ export default function AdminInstructorsPage() {
             </>
           )}
           <button className="btn" type="submit" disabled={savingInstructor}>
-            {savingInstructor ? 'جاري الإضافة...' : 'إضافة المدرب'}
+            {savingInstructor ? t('adding') : t('addInstructor')}
           </button>
         </form>
       </div>
 
-      <div style={{ fontWeight: 'bold', margin: '18px 0 10px' }}>المدربون ({instructors.length})</div>
-      {loading && <div className="empty">جاري التحميل...</div>}
-      {!loading && instructors.length === 0 && <div className="empty">ما في مدربين مسجلين بعد</div>}
+      <div style={{ fontWeight: 'bold', margin: '18px 0 10px' }}>{t('instructorsCount', { count: instructors.length })}</div>
+      {loading && <div className="empty">{tc('loading')}</div>}
+      {!loading && instructors.length === 0 && <div className="empty">{t('noInstructorsYet')}</div>}
 
       {!loading &&
         instructors.map((i) => (
@@ -359,10 +362,10 @@ export default function AdminInstructorsPage() {
                 className={`status-pill ${i.active ? 'present' : 'absent'}`}
                 style={{ marginInlineEnd: 8 }}
               >
-                {i.active ? 'نشط' : 'معطّل'}
+                {i.active ? t('active') : t('disabled')}
               </span>
               <span style={{ fontSize: 11, color: 'var(--text-dim)', marginInlineEnd: 8 }}>
-                {i.pay_type === 'monthly' ? 'شهري' : 'بالحصة'}
+                {i.pay_type === 'monthly' ? t('monthlyShort') : t('perSessionShort')}
               </span>
               <span style={{ fontWeight: 'bold', color: Number(i.current_balance) < 0 ? 'var(--absent)' : 'var(--text)' }}>
                 {Number(i.current_balance).toFixed(2)}
@@ -371,24 +374,24 @@ export default function AdminInstructorsPage() {
 
             {expandedInstructorId === i.id && (
               <div className="card" style={{ marginTop: -4 }}>
-                {loadingDetail && <div className="empty">جاري التحميل...</div>}
+                {loadingDetail && <div className="empty">{tc('loading')}</div>}
 
                 {!loadingDetail && instructorDetail && instructorDetail.instructor.id === i.id && (
                   <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                      <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>حالة الحساب</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-dim)' }}>{t('accountStatus')}</span>
                       <button
                         className="btn ghost"
                         type="button"
                         onClick={() => toggleActive(instructorDetail.instructor)}
                         style={{ width: 'auto', padding: '6px 12px', fontSize: 12 }}
                       >
-                        {instructorDetail.instructor.active ? 'تعطيل الحساب' : 'تفعيل الحساب'}
+                        {instructorDetail.instructor.active ? t('disableAccount') : t('enableAccount')}
                       </button>
                     </div>
 
                     <div className="field">
-                      <label>الاسم</label>
+                      <label>{t('nameLabel')}</label>
                       <input
                         type="text"
                         value={editForm.name}
@@ -396,7 +399,7 @@ export default function AdminInstructorsPage() {
                       />
                     </div>
                     <div className="field">
-                      <label>معلومة تواصل</label>
+                      <label>{t('contactLabel')}</label>
                       <input
                         type="text"
                         value={editForm.contact}
@@ -404,18 +407,18 @@ export default function AdminInstructorsPage() {
                       />
                     </div>
                     <div className="field">
-                      <label>نوع الدفع</label>
+                      <label>{t('payTypeLabel')}</label>
                       <select
                         value={editForm.pay_type}
                         onChange={(e) => setEditForm((f) => ({ ...f, pay_type: e.target.value }))}
                       >
-                        <option value="per_session">بالحصة اليومية</option>
-                        <option value="monthly">راتب شهري</option>
+                        <option value="per_session">{t('payTypePerSession')}</option>
+                        <option value="monthly">{t('payTypeMonthly')}</option>
                       </select>
                     </div>
                     {editForm.pay_type === 'per_session' ? (
                       <div className="field">
-                        <label>سعر الحصة اليومية</label>
+                        <label>{t('ratePerDayLabel')}</label>
                         <input
                           type="number"
                           min="0"
@@ -426,7 +429,7 @@ export default function AdminInstructorsPage() {
                     ) : (
                       <>
                         <div className="field">
-                          <label>الراتب الشهري</label>
+                          <label>{t('monthlySalaryLabel')}</label>
                           <input
                             type="number"
                             min="0"
@@ -435,7 +438,7 @@ export default function AdminInstructorsPage() {
                           />
                         </div>
                         <div className="field">
-                          <label>مبلغ خصم الغياب اليومي</label>
+                          <label>{t('monthlyAbsenceDeductionLabel')}</label>
                           <input
                             type="number"
                             min="0"
@@ -451,7 +454,7 @@ export default function AdminInstructorsPage() {
                       onClick={() => saveEdit(instructorDetail.instructor.id)}
                       disabled={savingEdit}
                     >
-                      {savingEdit ? 'جاري الحفظ...' : 'حفظ'}
+                      {savingEdit ? t('saving') : t('save')}
                     </button>
 
                     {instructorDetail.instructor.pay_type === 'monthly' && (
@@ -462,13 +465,13 @@ export default function AdminInstructorsPage() {
                         disabled={issuingSalary}
                         style={{ marginTop: 8 }}
                       >
-                        {issuingSalary ? 'جاري الإصدار...' : 'إصدار راتب هذا الشهر'}
+                        {issuingSalary ? t('issuing') : t('issueSalaryThisMonth')}
                       </button>
                     )}
 
-                    <div style={{ fontWeight: 'bold', margin: '18px 0 8px' }}>الأنشطة المرتبطة</div>
+                    <div style={{ fontWeight: 'bold', margin: '18px 0 8px' }}>{t('linkedActivities')}</div>
                     {instructorDetail.linkedActivities.length === 0 ? (
-                      <div className="empty">ما في نشاط مرتبط حالياً</div>
+                      <div className="empty">{t('noLinkedActivity')}</div>
                     ) : (
                       instructorDetail.linkedActivities.map((a) => (
                         <div key={a.id} style={{ fontSize: 13, padding: '6px 0' }}>

@@ -3,15 +3,21 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '../../Header';
-
-const ENTRY_TYPE_LABELS = {
-  payment: 'دفعة',
-  session_charge: 'تحصيل جلسة',
-  no_show_fee: 'غرامة غياب',
-  reversal: 'عكس حركة',
-};
+import { useLocale, useTranslations } from '@/lib/locale/LocaleContext';
 
 export default function FreelancerLedgerPage() {
+  const { locale } = useLocale();
+  const t = useTranslations('freelancer');
+  const tc = useTranslations('common');
+  const dateLocale = locale === 'en' ? 'en-US' : 'ar-EG';
+
+  const ENTRY_TYPE_LABELS = {
+    payment: t('entryPayment'),
+    session_charge: t('entrySessionCharge'),
+    no_show_fee: t('entryNoShowFee'),
+    reversal: t('entryReversal'),
+  };
+
   const [entries, setEntries] = useState([]);
   const [currentBalance, setCurrentBalance] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -21,7 +27,7 @@ export default function FreelancerLedgerPage() {
     fetch('/api/freelancer/ledger', { cache: 'no-store' })
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'صار خطأ');
+        if (!res.ok) throw new Error(data.error || tc('error'));
         setEntries(data.entries);
         setCurrentBalance(data.currentBalance);
       })
@@ -31,11 +37,11 @@ export default function FreelancerLedgerPage() {
 
   return (
     <div className="page">
-      <Header sub="كشف الحساب" />
+      <Header sub={t('ledgerSub')} />
       {error && <div className="msg error">{error}</div>}
 
       <div className="card" style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 6 }}>الرصيد الحالي</div>
+        <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 6 }}>{t('currentBalance')}</div>
         <div
           style={{
             fontSize: 28,
@@ -47,9 +53,9 @@ export default function FreelancerLedgerPage() {
         </div>
       </div>
 
-      {loading && <div className="empty">جاري التحميل...</div>}
+      {loading && <div className="empty">{tc('loading')}</div>}
 
-      {!loading && entries.length === 0 && <div className="empty">ما في حركات بعد</div>}
+      {!loading && entries.length === 0 && <div className="empty">{t('noEntriesYet')}</div>}
 
       {!loading &&
         entries.map((e) => (
@@ -58,7 +64,7 @@ export default function FreelancerLedgerPage() {
               <div>
                 <div style={{ fontWeight: 'bold' }}>{ENTRY_TYPE_LABELS[e.entry_type] || e.entry_type}</div>
                 <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
-                  {new Date(e.created_at).toLocaleString('ar-EG', {
+                  {new Date(e.created_at).toLocaleString(dateLocale, {
                     day: 'numeric',
                     month: 'long',
                     year: 'numeric',
@@ -79,7 +85,7 @@ export default function FreelancerLedgerPage() {
             </div>
 
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
-              الرصيد بعد الحركة: {Number(e.balance_after).toFixed(2)}
+              {t('balanceAfter', { balance: Number(e.balance_after).toFixed(2) })}
             </div>
 
             {e.note && (
@@ -89,14 +95,14 @@ export default function FreelancerLedgerPage() {
             {e.related_session_id && (
               <div style={{ marginTop: 8 }}>
                 <Link href={`/freelancer/sessions/${e.related_session_id}`} style={{ fontSize: 13, color: 'var(--accent-dark)' }}>
-                  عرض الجلسة المرتبطة ←
+                  {t('viewRelatedSession')}
                 </Link>
               </div>
             )}
 
             {e.reversed_entry_id && (
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
-                عكس للحركة #{e.reversed_entry_id}
+                {t('reversalOf', { id: e.reversed_entry_id })}
               </div>
             )}
           </div>

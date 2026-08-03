@@ -3,14 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '../../Header';
-
-const STATUS_LABELS = {
-  pending: 'بانتظار الموافقة',
-  approved: 'موافق عليها',
-  checked_in: 'جارية',
-  closed: 'مغلقة',
-  rejected: 'مرفوضة',
-};
+import { useLocale, useTranslations } from '@/lib/locale/LocaleContext';
 
 // Reuses the .status-pill shape/pattern already defined in globals.css
 // (padding, border-radius, font-size, no border) — only the color/tint
@@ -35,16 +28,29 @@ function statusPillStyle(status) {
   }
 }
 
-const FILTERS = [
-  { value: '', label: 'الكل' },
-  { value: 'pending', label: 'بانتظار الموافقة' },
-  { value: 'approved', label: 'موافق عليها' },
-  { value: 'checked_in', label: 'جارية' },
-  { value: 'closed', label: 'مغلقة' },
-  { value: 'rejected', label: 'مرفوضة' },
-];
-
 export default function FreelancerSessionsPage() {
+  const { locale } = useLocale();
+  const t = useTranslations('freelancer');
+  const tc = useTranslations('common');
+  const dateLocale = locale === 'en' ? 'en-US' : 'ar-EG';
+
+  const STATUS_LABELS = {
+    pending: t('statusPending'),
+    approved: t('statusApproved'),
+    checked_in: t('statusCheckedIn'),
+    closed: t('statusClosed'),
+    rejected: t('statusRejected'),
+  };
+
+  const FILTERS = [
+    { value: '', label: t('filterAll') },
+    { value: 'pending', label: t('statusPending') },
+    { value: 'approved', label: t('statusApproved') },
+    { value: 'checked_in', label: t('statusCheckedIn') },
+    { value: 'closed', label: t('statusClosed') },
+    { value: 'rejected', label: t('statusRejected') },
+  ];
+
   const [sessions, setSessions] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -57,7 +63,7 @@ export default function FreelancerSessionsPage() {
     fetch(url, { cache: 'no-store' })
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'صار خطأ');
+        if (!res.ok) throw new Error(data.error || tc('error'));
         setSessions(data.sessions);
       })
       .catch((err) => setError(err.message))
@@ -66,7 +72,7 @@ export default function FreelancerSessionsPage() {
 
   return (
     <div className="page">
-      <Header sub="جلساتي" />
+      <Header sub={t('mySessionsSub')} />
       {error && <div className="msg error">{error}</div>}
 
       <div className="tabs" style={{ flexWrap: 'wrap' }}>
@@ -82,9 +88,9 @@ export default function FreelancerSessionsPage() {
         ))}
       </div>
 
-      {loading && <div className="empty">جاري التحميل...</div>}
+      {loading && <div className="empty">{tc('loading')}</div>}
 
-      {!loading && sessions.length === 0 && <div className="empty">ما في جلسات بعد</div>}
+      {!loading && sessions.length === 0 && <div className="empty">{t('noSessionsYet')}</div>}
 
       {!loading &&
         sessions.map((s) => (
@@ -92,7 +98,7 @@ export default function FreelancerSessionsPage() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <div style={{ fontWeight: 'bold' }}>
-                  {new Date(s.session_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  {new Date(s.session_date).toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' })}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{s.session_time.slice(0, 5)}</div>
               </div>
@@ -102,7 +108,7 @@ export default function FreelancerSessionsPage() {
             </div>
             {s.status === 'rejected' && s.rejection_reason && (
               <div style={{ fontSize: 13, color: 'var(--absent)', marginTop: 8 }}>
-                سبب الرفض: {s.rejection_reason}
+                {t('rejectionReason', { reason: s.rejection_reason })}
               </div>
             )}
           </Link>

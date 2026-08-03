@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import Header from '../Header';
+import { useTranslations } from '@/lib/locale/LocaleContext';
 
 function compressImage(file, maxSize = 300, quality = 0.7) {
   return new Promise((resolve, reject) => {
@@ -34,9 +35,12 @@ function compressImage(file, maxSize = 300, quality = 0.7) {
 }
 
 const MAX_PHOTO_SIZE_MB = 10;
-const STEP_LABELS = ['المتدرب', 'ولي الأمر', 'معلومات طبية', 'الموافقات'];
 
 export default function RegisterPage() {
+  const t = useTranslations('register');
+  const tc = useTranslations('common');
+  const STEP_LABELS = [t('stepTrainee'), t('stepParent'), t('stepMedical'), t('stepConsent')];
+
   const [step, setStep] = useState(1);
   const [activities, setActivities] = useState([]);
 
@@ -100,11 +104,11 @@ export default function RegisterPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setError('لازم تختار ملف صورة');
+      setError(t('errPhotoType'));
       return;
     }
     if (file.size > MAX_PHOTO_SIZE_MB * 1024 * 1024) {
-      setError(`حجم الصورة كبير، الحد الأقصى ${MAX_PHOTO_SIZE_MB} ميغا`);
+      setError(t('errPhotoSize', { maxMb: MAX_PHOTO_SIZE_MB }));
       return;
     }
     try {
@@ -113,36 +117,36 @@ export default function RegisterPage() {
       setPhotoPreview(compressed);
       setError('');
     } catch {
-      setError('ما قدرنا نحمّل الصورة، جرب صورة تانية');
+      setError(t('errPhotoUpload'));
     }
   };
 
   const validateStep1 = () => {
-    if (!fullName.trim()) return 'اسم المتدرب مطلوب';
-    if (!dateOfBirth) return 'تاريخ ميلاد المتدرب مطلوب';
-    if (!nationality.trim()) return 'الجنسية مطلوبة';
-    if (!gender) return 'الجنس مطلوب';
+    if (!fullName.trim()) return t('errFullNameRequired');
+    if (!dateOfBirth) return t('errDobRequired');
+    if (!nationality.trim()) return t('errNationalityRequired');
+    if (!gender) return t('errGenderRequired');
     return '';
   };
 
   const validateStep2 = () => {
-    if (!parentFullName.trim()) return 'اسم ولي الأمر مطلوب';
-    if (!relationshipToChild.trim()) return 'صلة القرابة مطلوبة';
-    if (!parentPhone.trim()) return 'رقم تواصل ولي الأمر مطلوب';
-    if (!parentEmail.trim()) return 'البريد الإلكتروني لولي الأمر مطلوب';
+    if (!parentFullName.trim()) return t('errParentFullNameRequired');
+    if (!relationshipToChild.trim()) return t('errRelationshipRequired');
+    if (!parentPhone.trim()) return t('errParentPhoneRequired');
+    if (!parentEmail.trim()) return t('errParentEmailRequired');
     return '';
   };
 
   const validateStep3 = () => {
-    if (hasMedicalCondition === '') return 'الرجاء الإجابة عن سؤال الحالة الصحية';
-    if (hasMedicalCondition === 'yes' && !medicalConditionDetails.trim()) return 'الرجاء ذكر تفاصيل الحالة الصحية';
-    if (isOnMedication === '') return 'الرجاء الإجابة عن سؤال الأدوية';
-    if (isOnMedication === 'yes' && !medicationDetails.trim()) return 'الرجاء ذكر تفاصيل الأدوية';
+    if (hasMedicalCondition === '') return t('errMedicalAnswerRequired');
+    if (hasMedicalCondition === 'yes' && !medicalConditionDetails.trim()) return t('errMedicalDetailsRequired');
+    if (isOnMedication === '') return t('errMedicationAnswerRequired');
+    if (isOnMedication === 'yes' && !medicationDetails.trim()) return t('errMedicationDetailsRequired');
     return '';
   };
 
   const validateStep4 = () => {
-    if (!consentTermsAccepted) return 'الموافقة على الشروط والأحكام مطلوبة للمتابعة';
+    if (!consentTermsAccepted) return t('errConsentRequired');
     return '';
   };
 
@@ -201,7 +205,7 @@ export default function RegisterPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'صار خطأ');
+      if (!res.ok) throw new Error(data.error || tc('error'));
       setResult(data.child);
     } catch (err) {
       setError(err.message);
@@ -221,7 +225,7 @@ export default function RegisterPage() {
       link.download = `qr-${result.full_name}.png`;
       link.click();
     } catch {
-      alert('ما قدرنا ننشئ الصورة، جرب مرة تانية');
+      alert(t('errBadgeDownload'));
     } finally {
       setDownloading(false);
     }
@@ -230,9 +234,9 @@ export default function RegisterPage() {
   if (result) {
     return (
       <div className="page">
-        <Header sub="تم التسجيل بنجاح" />
+        <Header sub={t('successTitle')} />
         <div className="msg success">
-          تم تسجيل {result.full_name} بنجاح ✓ — هاد الكود الخاص فيه، احتفظوا فيه أو صوروه، رح يُستخدم لتسجيل الحضور يومياً.
+          {t('successMessage', { name: result.full_name })}
         </div>
         <div className="badge-card" ref={badgeRef}>
           {photoPreview && <img src={photoPreview} alt={result.full_name} className="photo" />}
@@ -243,16 +247,16 @@ export default function RegisterPage() {
           <div style={{ fontSize: 12, color: '#666' }}>Black Whale Academy 🐋</div>
         </div>
         <button className="btn secondary" type="button" onClick={downloadBadge} disabled={downloading} style={{ marginBottom: 10 }}>
-          {downloading ? 'جاري التحضير...' : '📥 تحميل صورة'}
+          {downloading ? t('preparingImage') : t('downloadImage')}
         </button>
-        <a href="/register" className="btn secondary">تسجيل متدرب تاني</a>
+        <a href="/register" className="btn secondary">{t('registerAnother')}</a>
       </div>
     );
   }
 
   return (
     <div className="page">
-      <Header sub="نموذج تسجيل متدرب جديد" />
+      <Header sub={t('formTitle')} />
       {error && <div className="msg error">{error}</div>}
 
       <div className="tabs" style={{ marginBottom: 14 }}>
@@ -267,37 +271,37 @@ export default function RegisterPage() {
         {step === 1 && (
           <div className="card">
             <div className="field">
-              <label>اسم المتدرب الكامل *</label>
+              <label>{t('fullNameLabel')}</label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="مثال: أحمد خالد"
+                placeholder={t('fullNamePlaceholder')}
               />
             </div>
             <div className="field">
-              <label>تاريخ الميلاد *</label>
+              <label>{t('dobLabel')}</label>
               <input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
             </div>
             <div className="field">
-              <label>الجنسية *</label>
+              <label>{t('nationalityLabel')}</label>
               <input
                 type="text"
                 value={nationality}
                 onChange={(e) => setNationality(e.target.value)}
-                placeholder="مثال: إماراتي"
+                placeholder={t('nationalityPlaceholder')}
               />
             </div>
             <div className="field">
-              <label>الجنس *</label>
+              <label>{t('genderLabel')}</label>
               <select value={gender} onChange={(e) => setGender(e.target.value)}>
-                <option value="">اختر</option>
-                <option value="male">ذكر</option>
-                <option value="female">أنثى</option>
+                <option value="">{t('genderSelect')}</option>
+                <option value="male">{t('genderMale')}</option>
+                <option value="female">{t('genderFemale')}</option>
               </select>
             </div>
             <div className="field">
-              <label>صورة المتدرب</label>
+              <label>{t('photoLabel')}</label>
               <div className="photo-input">
                 {photoPreview ? (
                   <img src={photoPreview} alt="preview" className="photo-preview" />
@@ -308,8 +312,8 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <div style={{ fontWeight: 'bold', margin: '18px 0 12px' }}>الأنشطة (اختياري — ممكن تختار أكتر من نشاط)</div>
-            {activities.length === 0 && <div className="empty">لا يوجد أنشطة متاحة حالياً</div>}
+            <div style={{ fontWeight: 'bold', margin: '18px 0 12px' }}>{t('activitiesTitle')}</div>
+            {activities.length === 0 && <div className="empty">{t('noActivities')}</div>}
             {activities.map((a) => {
               const isChecked = Object.prototype.hasOwnProperty.call(selected, a.id);
               const hasPackages = a.packages && a.packages.length > 0;
@@ -332,7 +336,7 @@ export default function RegisterPage() {
                     </span>
                   </label>
                   {!hasPackages && (
-                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>لسا ما في باقات متاحة لهالنشاط</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>{t('noPackages')}</div>
                   )}
                   {isChecked && hasPackages && (
                     <select
@@ -342,7 +346,7 @@ export default function RegisterPage() {
                     >
                       {a.packages.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.session_count} حصص — {p.price} درهم
+                          {t('packageOption', { count: p.session_count, price: p.price })}
                         </option>
                       ))}
                     </select>
@@ -351,45 +355,45 @@ export default function RegisterPage() {
               );
             })}
 
-            <button className="btn" type="button" onClick={goNext} style={{ marginTop: 12 }}>التالي →</button>
+            <button className="btn" type="button" onClick={goNext} style={{ marginTop: 12 }}>{tc('next')} →</button>
           </div>
         )}
 
         {step === 2 && (
           <div className="card">
             <div className="field">
-              <label>اسم ولي الأمر الكامل *</label>
+              <label>{t('parentFullNameLabel')}</label>
               <input type="text" value={parentFullName} onChange={(e) => setParentFullName(e.target.value)} />
             </div>
             <div className="field">
-              <label>صلة القرابة *</label>
+              <label>{t('relationshipLabel')}</label>
               <input
                 type="text"
                 value={relationshipToChild}
                 onChange={(e) => setRelationshipToChild(e.target.value)}
-                placeholder="مثال: أب، أم، وصي"
+                placeholder={t('relationshipPlaceholder')}
               />
             </div>
             <div className="field">
-              <label>رقم تواصل ولي الأمر *</label>
+              <label>{t('parentPhoneLabel')}</label>
               <input
                 type="tel"
                 value={parentPhone}
                 onChange={(e) => setParentPhone(e.target.value)}
-                placeholder="05xxxxxxxx"
+                placeholder={t('parentPhonePlaceholder')}
               />
             </div>
             <div className="field">
-              <label>البريد الإلكتروني *</label>
+              <label>{t('parentEmailLabel')}</label>
               <input type="email" value={parentEmail} onChange={(e) => setParentEmail(e.target.value)} />
             </div>
             <div className="field">
-              <label>العنوان (اختياري)</label>
+              <label>{t('addressLabel')}</label>
               <input type="text" value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <button className="btn secondary" type="button" onClick={goBack} style={{ flex: 1 }}>← رجوع</button>
-              <button className="btn" type="button" onClick={goNext} style={{ flex: 1 }}>التالي →</button>
+              <button className="btn secondary" type="button" onClick={goBack} style={{ flex: 1 }}>← {tc('back')}</button>
+              <button className="btn" type="button" onClick={goNext} style={{ flex: 1 }}>{tc('next')} →</button>
             </div>
           </div>
         )}
@@ -397,7 +401,7 @@ export default function RegisterPage() {
         {step === 3 && (
           <div className="card">
             <div className="field">
-              <label>هل عند المتدرب حالة صحية يجب الانتباه لها؟ *</label>
+              <label>{t('hasMedicalConditionLabel')}</label>
               <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <input
@@ -406,7 +410,7 @@ export default function RegisterPage() {
                     checked={hasMedicalCondition === 'yes'}
                     onChange={() => setHasMedicalCondition('yes')}
                   />
-                  نعم
+                  {tc('yes')}
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <input
@@ -418,13 +422,13 @@ export default function RegisterPage() {
                       setMedicalConditionDetails('');
                     }}
                   />
-                  لا
+                  {tc('no')}
                 </label>
               </div>
             </div>
             {hasMedicalCondition === 'yes' && (
               <div className="field">
-                <label>تفاصيل الحالة الصحية *</label>
+                <label>{t('medicalConditionDetailsLabel')}</label>
                 <input
                   type="text"
                   value={medicalConditionDetails}
@@ -434,7 +438,7 @@ export default function RegisterPage() {
             )}
 
             <div className="field">
-              <label>هل يتناول المتدرب أدوية بشكل منتظم؟ *</label>
+              <label>{t('isOnMedicationLabel')}</label>
               <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <input
@@ -443,7 +447,7 @@ export default function RegisterPage() {
                     checked={isOnMedication === 'yes'}
                     onChange={() => setIsOnMedication('yes')}
                   />
-                  نعم
+                  {tc('yes')}
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <input
@@ -455,20 +459,20 @@ export default function RegisterPage() {
                       setMedicationDetails('');
                     }}
                   />
-                  لا
+                  {tc('no')}
                 </label>
               </div>
             </div>
             {isOnMedication === 'yes' && (
               <div className="field">
-                <label>تفاصيل الأدوية *</label>
+                <label>{t('medicationDetailsLabel')}</label>
                 <input type="text" value={medicationDetails} onChange={(e) => setMedicationDetails(e.target.value)} />
               </div>
             )}
 
             <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-              <button className="btn secondary" type="button" onClick={goBack} style={{ flex: 1 }}>← رجوع</button>
-              <button className="btn" type="button" onClick={goNext} style={{ flex: 1 }}>التالي →</button>
+              <button className="btn secondary" type="button" onClick={goBack} style={{ flex: 1 }}>← {tc('back')}</button>
+              <button className="btn" type="button" onClick={goNext} style={{ flex: 1 }}>{tc('next')} →</button>
             </div>
           </div>
         )}
@@ -482,7 +486,7 @@ export default function RegisterPage() {
                 onChange={(e) => setConsentTermsAccepted(e.target.checked)}
                 style={{ marginTop: 3 }}
               />
-              <span>أوافق على الشروط والأحكام الخاصة بأكاديمية الحوت الأسود *</span>
+              <span>{t('consentTermsLabel')}</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
               <input
@@ -491,13 +495,13 @@ export default function RegisterPage() {
                 onChange={(e) => setConsentMarketingPhotos(e.target.checked)}
                 style={{ marginTop: 3 }}
               />
-              <span>أوافق على استخدام صور المتدرب لأغراض التسويق (اختياري)</span>
+              <span>{t('consentMarketingLabel')}</span>
             </label>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <button className="btn secondary" type="button" onClick={goBack} style={{ flex: 1 }}>← رجوع</button>
+              <button className="btn secondary" type="button" onClick={goBack} style={{ flex: 1 }}>← {tc('back')}</button>
               <button className="btn" type="submit" disabled={submitting} style={{ flex: 1 }}>
-                {submitting ? 'جاري التسجيل...' : 'تسجيل'}
+                {submitting ? t('submitting') : t('submit')}
               </button>
             </div>
           </div>

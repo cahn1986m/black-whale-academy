@@ -129,6 +129,17 @@ input, select, textarea {
   margin: 0;
 }
 
+.locale-toggle {
+  flex-shrink: 0;
+  background: var(--surface-2);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);

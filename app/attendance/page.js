@@ -2,26 +2,26 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Header from '../Header';
+import { useTranslations } from '@/lib/locale/LocaleContext';
 
 const SCAN_COOLDOWN_MS = 2500;
 
-const CAMERA_ERROR_MESSAGES = {
-  NotAllowedError: 'تم رفض إذن الكاميرا. فعّل إذن الكاميرا من إعدادات المتصفح ثم حاول مرة تانية.',
-  PermissionDeniedError: 'تم رفض إذن الكاميرا. فعّل إذن الكاميرا من إعدادات المتصفح ثم حاول مرة تانية.',
-  NotFoundError: 'ما في كاميرا متوفرة على هالجهاز.',
-  DevicesNotFoundError: 'ما في كاميرا متوفرة على هالجهاز.',
-  NotReadableError: 'الكاميرا مستخدمة حالياً من تطبيق تاني. سكّر التطبيقات التانية وجرب مرة كمان.',
-  TrackStartError: 'الكاميرا مستخدمة حالياً من تطبيق تاني. سكّر التطبيقات التانية وجرب مرة كمان.',
-  OverconstrainedError: 'ما قدرنا نفتح الكاميرا المطلوبة على هالجهاز.',
-  SecurityError: 'لازم تفتح الموقع عبر رابط آمن (HTTPS) عشان تشتغل الكاميرا.',
-};
-
-function getCameraErrorMessage(err) {
-  if (!err) return 'ما قدرنا نفتح الكاميرا لسبب غير معروف.';
+function getCameraErrorMessage(err, t) {
+  if (!err) return t('cameraErrorUnknown');
   const name = err.name || '';
-  if (CAMERA_ERROR_MESSAGES[name]) return CAMERA_ERROR_MESSAGES[name];
+  const map = {
+    NotAllowedError: t('cameraErrorPermission'),
+    PermissionDeniedError: t('cameraErrorPermission'),
+    NotFoundError: t('cameraErrorNoCamera'),
+    DevicesNotFoundError: t('cameraErrorNoCamera'),
+    NotReadableError: t('cameraErrorInUse'),
+    TrackStartError: t('cameraErrorInUse'),
+    OverconstrainedError: t('cameraErrorConstraint'),
+    SecurityError: t('cameraErrorHttps'),
+  };
+  if (map[name]) return map[name];
   const detail = err.message || (typeof err === 'string' ? err : '');
-  return detail ? `ما قدرنا نفتح الكاميرا: ${detail}` : 'ما قدرنا نفتح الكاميرا.';
+  return detail ? t('cameraErrorWithDetail', { detail }) : t('cameraErrorGeneric');
 }
 
 function playTone(ctx, { start, duration, freq, type = 'square', peakGain = 0.35 }) {
@@ -97,6 +97,8 @@ function playExpiredDateBeep(ctx) {
 }
 
 export default function AttendancePage() {
+  const t = useTranslations('staff');
+  const tc = useTranslations('common');
   const [activities, setActivities] = useState([]);
   const [activityId, setActivityId] = useState('');
   const [records, setRecords] = useState([]);
@@ -182,23 +184,23 @@ export default function AttendancePage() {
       const data = await res.json();
       if (!res.ok) {
         if (audioCtxRef.current) playErrorBeep(audioCtxRef.current);
-        setFlash({ type: 'error', text: data.error || 'كود غير معروف' });
+        setFlash({ type: 'error', text: data.error || t('unknownCode') });
       } else if (data.dateExpired) {
         if (audioCtxRef.current) playExpiredDateBeep(audioCtxRef.current);
-        setFlash({ type: 'error', text: `⚠️ تم تسجيل ${data.child.full_name} حاضر — لكن خلصت المدة (اطلب تجديد الاشتراك)` });
+        setFlash({ type: 'error', text: t('scanTimeExpiredMsg', { name: data.child.full_name }) });
         loadRecords();
       } else if (data.sessionsRemaining != null && data.sessionsRemaining <= 0) {
         if (audioCtxRef.current) playWarningBeep(audioCtxRef.current);
-        setFlash({ type: 'error', text: `⚠️ تم تسجيل ${data.child.full_name} حاضر — لكن ما إله حصص متبقية (اطلب تجديد الاشتراك)` });
+        setFlash({ type: 'error', text: t('scanSessionsExpiredMsg', { name: data.child.full_name }) });
         loadRecords();
       } else {
         if (audioCtxRef.current) playSuccessBeep(audioCtxRef.current);
-        setFlash({ type: 'success', text: `تم تسجيل ${data.child.full_name} حاضر ✓` });
+        setFlash({ type: 'success', text: t('scanSuccessMsg', { name: data.child.full_name }) });
         loadRecords();
       }
     } catch {
       if (audioCtxRef.current) playErrorBeep(audioCtxRef.current);
-      setFlash({ type: 'error', text: 'صار خطأ بالاتصال' });
+      setFlash({ type: 'error', text: t('connectionError') });
     }
     setTimeout(() => setFlash(null), 2200);
   };
@@ -209,11 +211,11 @@ export default function AttendancePage() {
     setCameraError('');
 
     if (typeof window === 'undefined' || !window.isSecureContext) {
-      setCameraError('لازم تفتح الموقع عبر رابط آمن (HTTPS) عشان تشتغل الكاميرا.');
+      setCameraError(t('cameraErrorHttps'));
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError('المتصفح ما بيدعم الوصول للكاميرا.');
+      setCameraError(t('browserNoCameraSupport'));
       return;
     }
 
@@ -293,7 +295,7 @@ export default function AttendancePage() {
     if (!started) {
       scannerRef.current = null;
       setScanning(false);
-      setCameraError(getCameraErrorMessage(lastError));
+      setCameraError(getCameraErrorMessage(lastError, t));
     }
   };
 
@@ -350,13 +352,13 @@ export default function AttendancePage() {
 
   return (
     <div className="page">
-      <a href="/" className="back-link">← الرئيسية</a>
-      <Header sub="الحضور اليومي" />
+      <a href="/" className="back-link">← {tc('backHome')}</a>
+      <Header sub={t('attendanceSub')} />
 
       <div className="field">
-        <label>اختر النشاط</label>
+        <label>{t('selectActivityLabel')}</label>
         <select value={activityId} onChange={(e) => setActivityId(e.target.value)}>
-          <option value="">-- اختر نشاط --</option>
+          <option value="">{t('selectActivityPlaceholder')}</option>
           {activities.map((a) => (
             <option key={a.id} value={a.id}>
               {a.emoji ? `${a.emoji} ` : ''}{a.name} {a.instructor_name ? `(${a.instructor_name})` : ''}
@@ -365,12 +367,12 @@ export default function AttendancePage() {
         </select>
       </div>
 
-      {!activityId && <div className="empty">اختر النشاط أولاً للبدء بالمسح</div>}
+      {!activityId && <div className="empty">{t('selectActivityFirst')}</div>}
 
       {activityId && (
         <>
           <div className="summary-bar">
-            <span>حاضر اليوم</span>
+            <span>{t('presentToday')}</span>
             <span className="count">{presentCount} / {records.length}</span>
           </div>
 
@@ -379,19 +381,19 @@ export default function AttendancePage() {
 
           {!scanning ? (
             <button className="btn" onClick={startScanner} type="button" disabled={starting}>
-              {starting ? 'جاري فتح الكاميرا...' : '📷 ابدأ مسح QR'}
+              {starting ? t('startingCamera') : t('startScan')}
             </button>
           ) : (
             <button className="btn secondary" onClick={stopScanner} type="button">
-              إيقاف الكاميرا
+              {t('stopCamera')}
             </button>
           )}
 
           <div id="qr-reader" className="scanner-box" style={{ display: scanning ? 'block' : 'none', marginTop: 12 }} />
 
           <div style={{ marginTop: 16 }}>
-            {loading && <div className="empty">جاري التحميل...</div>}
-            {!loading && records.length === 0 && <div className="empty">ما في متدربين مسجلين بهالنشاط بعد</div>}
+            {loading && <div className="empty">{tc('loading')}</div>}
+            {!loading && records.length === 0 && <div className="empty">{t('noTraineesInActivity')}</div>}
             {records.map((r) => (
               <div className="child-row" key={r.enrollment_id}>
                 {r.photo_base64 ? (
@@ -402,9 +404,9 @@ export default function AttendancePage() {
                 <span className="name">
                   {r.full_name}
                   {r.date_expired ? (
-                    <span style={{ display: 'block', fontSize: 11, color: 'var(--absent)' }}>خلصت المدة</span>
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--absent)' }}>{t('timeExpired')}</span>
                   ) : r.sessions_remaining <= 0 ? (
-                    <span style={{ display: 'block', fontSize: 11, color: 'var(--absent)' }}>خلصت الحصص</span>
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--absent)' }}>{t('sessionsExpired')}</span>
                   ) : null}
                 </span>
                 <button
@@ -412,7 +414,7 @@ export default function AttendancePage() {
                   className={`status-pill ${r.status === 'present' ? 'present' : 'absent'}`}
                   onClick={() => markStatus(r.enrollment_id, r.status === 'present' ? 'absent' : 'present')}
                 >
-                  {r.status === 'present' ? 'حاضر' : 'غايب'}
+                  {r.status === 'present' ? t('present') : t('absent')}
                 </button>
               </div>
             ))}

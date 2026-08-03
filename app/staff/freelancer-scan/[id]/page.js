@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Header from '../../../Header';
+import { useTranslations } from '@/lib/locale/LocaleContext';
 
 const SCAN_COOLDOWN_MS = 2500;
 
@@ -14,23 +15,22 @@ const SCAN_COOLDOWN_MS = 2500;
 // duplicated here rather than refactored into a shared module, which
 // wasn't requested and would mean editing the existing attendance page.
 
-const CAMERA_ERROR_MESSAGES = {
-  NotAllowedError: 'تم رفض إذن الكاميرا. فعّل إذن الكاميرا من إعدادات المتصفح ثم حاول مرة تانية.',
-  PermissionDeniedError: 'تم رفض إذن الكاميرا. فعّل إذن الكاميرا من إعدادات المتصفح ثم حاول مرة تانية.',
-  NotFoundError: 'ما في كاميرا متوفرة على هالجهاز.',
-  DevicesNotFoundError: 'ما في كاميرا متوفرة على هالجهاز.',
-  NotReadableError: 'الكاميرا مستخدمة حالياً من تطبيق تاني. سكّر التطبيقات التانية وجرب مرة كمان.',
-  TrackStartError: 'الكاميرا مستخدمة حالياً من تطبيق تاني. سكّر التطبيقات التانية وجرب مرة كمان.',
-  OverconstrainedError: 'ما قدرنا نفتح الكاميرا المطلوبة على هالجهاز.',
-  SecurityError: 'لازم تفتح الموقع عبر رابط آمن (HTTPS) عشان تشتغل الكاميرا.',
-};
-
-function getCameraErrorMessage(err) {
-  if (!err) return 'ما قدرنا نفتح الكاميرا لسبب غير معروف.';
+function getCameraErrorMessage(err, t) {
+  if (!err) return t('cameraErrorUnknown');
   const name = err.name || '';
-  if (CAMERA_ERROR_MESSAGES[name]) return CAMERA_ERROR_MESSAGES[name];
+  const map = {
+    NotAllowedError: t('cameraErrorPermission'),
+    PermissionDeniedError: t('cameraErrorPermission'),
+    NotFoundError: t('cameraErrorNoCamera'),
+    DevicesNotFoundError: t('cameraErrorNoCamera'),
+    NotReadableError: t('cameraErrorInUse'),
+    TrackStartError: t('cameraErrorInUse'),
+    OverconstrainedError: t('cameraErrorConstraint'),
+    SecurityError: t('cameraErrorHttps'),
+  };
+  if (map[name]) return map[name];
   const detail = err.message || (typeof err === 'string' ? err : '');
-  return detail ? `ما قدرنا نفتح الكاميرا: ${detail}` : 'ما قدرنا نفتح الكاميرا.';
+  return detail ? t('cameraErrorWithDetail', { detail }) : t('cameraErrorGeneric');
 }
 
 function playTone(ctx, { start, duration, freq, type = 'square', peakGain = 0.35 }) {
@@ -83,6 +83,8 @@ function playErrorBeep(ctx) {
 // --- End of code copied verbatim from app/attendance/page.js.
 
 export default function StaffFreelancerScanPage({ params }) {
+  const t = useTranslations('staff');
+  const tc = useTranslations('common');
   const sessionId = params.id;
 
   const [session, setSession] = useState(null);
@@ -109,7 +111,7 @@ export default function StaffFreelancerScanPage({ params }) {
     fetch(`/api/admin/freelancer-sessions/${sessionId}`, { cache: 'no-store' })
       .then(async (res) => {
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'صار خطأ');
+        if (!res.ok) throw new Error(data.error || tc('error'));
         setSession(data.session);
         setLevelCounts(data.levelCounts);
         setQrTokens(data.qrTokens);
@@ -146,32 +148,32 @@ export default function StaffFreelancerScanPage({ params }) {
         // Outcome 1: valid, unused token for this session.
         if (audioCtxRef.current) playSuccessBeep(audioCtxRef.current);
         setQrTokens((prev) =>
-          prev.map((t) => (t.token === text ? { ...t, status: 'scanned', scanned_at: new Date().toISOString() } : t))
+          prev.map((tok) => (tok.token === text ? { ...tok, status: 'scanned', scanned_at: new Date().toISOString() } : tok))
         );
-        setFlash({ type: 'success', text: 'تم تسجيل الحضور ✓' });
+        setFlash({ type: 'success', text: t('attendanceRecorded') });
       } else if (data.error === 'token has expired') {
         // Outcome 2: expired (still marked unused in the DB, but past its window).
         if (audioCtxRef.current) playWarningBeep(audioCtxRef.current);
-        setFlash({ type: 'warning', text: 'هاد الرمز منتهي' });
+        setFlash({ type: 'warning', text: t('tokenExpired') });
       } else if (data.error === 'token already used or expired') {
         // Outcome 2: either already scanned, or already flagged expired_no_show —
         // disambiguate using the token's last-known local status.
-        const existing = qrTokensRef.current.find((t) => t.token === text);
+        const existing = qrTokensRef.current.find((tok) => tok.token === text);
         if (existing && existing.status === 'scanned') {
           if (audioCtxRef.current) playWarningBeep(audioCtxRef.current);
-          setFlash({ type: 'warning', text: 'هاد الرمز انمسح قبل هيك' });
+          setFlash({ type: 'warning', text: t('tokenAlreadyScanned') });
         } else {
           if (audioCtxRef.current) playWarningBeep(audioCtxRef.current);
-          setFlash({ type: 'warning', text: 'هاد الرمز منتهي' });
+          setFlash({ type: 'warning', text: t('tokenExpired') });
         }
       } else {
         // Outcome 3: unknown token, or belongs to another session/freelancer.
         if (audioCtxRef.current) playErrorBeep(audioCtxRef.current);
-        setFlash({ type: 'error', text: 'رمز غير معروف' });
+        setFlash({ type: 'error', text: t('unknownToken') });
       }
     } catch {
       if (audioCtxRef.current) playErrorBeep(audioCtxRef.current);
-      setFlash({ type: 'error', text: 'صار خطأ بالاتصال' });
+      setFlash({ type: 'error', text: t('connectionError') });
     }
     setTimeout(() => setFlash(null), 2200);
   };
@@ -182,11 +184,11 @@ export default function StaffFreelancerScanPage({ params }) {
     setCameraError('');
 
     if (typeof window === 'undefined' || !window.isSecureContext) {
-      setCameraError('لازم تفتح الموقع عبر رابط آمن (HTTPS) عشان تشتغل الكاميرا.');
+      setCameraError(t('cameraErrorHttps'));
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia) {
-      setCameraError('المتصفح ما بيدعم الوصول للكاميرا.');
+      setCameraError(t('browserNoCameraSupport'));
       return;
     }
 
@@ -254,7 +256,7 @@ export default function StaffFreelancerScanPage({ params }) {
     if (!started) {
       scannerRef.current = null;
       setScanning(false);
-      setCameraError(getCameraErrorMessage(lastError));
+      setCameraError(getCameraErrorMessage(lastError, t));
     }
   };
 
@@ -308,18 +310,18 @@ export default function StaffFreelancerScanPage({ params }) {
 
   return (
     <div className="page">
-      <Link href="/staff/freelancer-scan" className="back-link">← قائمة الجلسات</Link>
-      <Header sub="مسح رموز QR" />
+      <Link href="/staff/freelancer-scan" className="back-link">← {t('backSessionsList')}</Link>
+      <Header sub={t('scanQrSub')} />
 
       {error && <div className="msg error">{error}</div>}
 
-      {loading && <div className="empty">جاري التحميل...</div>}
+      {loading && <div className="empty">{tc('loading')}</div>}
 
       {!loading && session && !canScan && (
         <>
-          <div className="msg error">هاي الجلسة مش جاهزة للمسح</div>
+          <div className="msg error">{t('sessionNotReady')}</div>
           <Link href="/staff/freelancer-scan" className="btn secondary" style={{ display: 'flex' }}>
-            رجوع لقائمة الجلسات
+            {t('backToSessionsList')}
           </Link>
         </>
       )}
@@ -328,7 +330,7 @@ export default function StaffFreelancerScanPage({ params }) {
         <>
           <div style={{ marginBottom: 14 }}>
             {levelCounts.map((lc) => {
-              const scannedCount = qrTokens.filter((t) => t.level === lc.level && t.status === 'scanned').length;
+              const scannedCount = qrTokens.filter((tok) => tok.level === lc.level && tok.status === 'scanned').length;
               return (
                 <div className="summary-bar" key={lc.level} style={{ marginBottom: 8 }}>
                   <span>{lc.level}</span>
@@ -343,11 +345,11 @@ export default function StaffFreelancerScanPage({ params }) {
 
           {!scanning ? (
             <button className="btn" onClick={startScanner} type="button" disabled={starting}>
-              {starting ? 'جاري فتح الكاميرا...' : '📷 ابدأ المسح'}
+              {starting ? t('startingCamera') : t('startScanShort')}
             </button>
           ) : (
             <button className="btn secondary" onClick={stopScanner} type="button">
-              إيقاف الكاميرا
+              {t('stopCamera')}
             </button>
           )}
 
