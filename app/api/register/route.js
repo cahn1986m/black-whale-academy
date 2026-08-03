@@ -19,6 +19,10 @@ export async function POST(request) {
       return NextResponse.json({ error: 'اسم الطفل مطلوب' }, { status: 400 });
     }
 
+    if (!parentContact) {
+      return NextResponse.json({ error: 'رقم تواصل ولي الأمر مطلوب' }, { status: 400 });
+    }
+
     // Dedupe by activityId (keep the first package pick per activity).
     const selectionsByActivity = new Map();
     for (const sel of rawSelections) {
@@ -48,8 +52,8 @@ export async function POST(request) {
       const qrToken = nanoid();
       try {
         [child] = await sql`
-          INSERT INTO children (full_name, parent_contact, photo_base64, qr_token)
-          VALUES (${fullName}, ${parentContact || null}, ${photoBase64}, ${qrToken})
+          INSERT INTO children (full_name, parent_phone, photo_base64, qr_token)
+          VALUES (${fullName}, ${parentContact}, ${photoBase64}, ${qrToken})
           RETURNING id, full_name, qr_token
         `;
         break;
