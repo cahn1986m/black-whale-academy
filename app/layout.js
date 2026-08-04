@@ -9,10 +9,13 @@ const cairo = Cairo({
   variable: '--font-cairo',
 });
 
-export const metadata = {
-  title: 'الحوت الأسود | تفقد الحضور',
-  description: 'نظام تفقد الحضور اليومي - نادي الحوت الأسود',
-};
+export function generateMetadata() {
+  const localeCookie = cookies().get('bwa_locale')?.value;
+  const locale = localeCookie === 'en' ? 'en' : 'ar';
+  return locale === 'en'
+    ? { title: 'Black Whale Academy | Attendance', description: 'Daily attendance system - Black Whale Academy' }
+    : { title: 'الحوت الأسود | تفقد الحضور', description: 'نظام تفقد الحضور اليومي - نادي الحوت الأسود' };
+}
 
 export const viewport = {
   width: 'device-width',

@@ -25,7 +25,8 @@
     "freelancerLinkLabel": "رابط الدخول للمدربين المستقلين",
     "copyLink": "نسخ الرابط",
     "copied": "تم النسخ ✓",
-    "currencyAed": "درهم"
+    "currencyAed": "درهم",
+    "siteTitle": "الحوت الأسود | تفقد الحضور"
   },
   "en": {
     "loading": "Loading...",
@@ -53,6 +54,7 @@
     "freelancerLinkLabel": "Freelance coach login link",
     "copyLink": "Copy link",
     "copied": "Copied ✓",
-    "currencyAed": "AED"
+    "currencyAed": "AED",
+    "siteTitle": "Black Whale Academy | Attendance"
   }
 }
