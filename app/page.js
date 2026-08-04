@@ -13,7 +13,7 @@ export default function HomePage() {
       <Header sub={t('homeSub')} />
 
       <div className="nav-grid">
-        <Link href="/attendance" className="nav-tile">
+        <Link href="/staff" className="nav-tile">
           <span className="emoji">✅</span>
           <span className="label">{t('navDailyAttendance')}</span>
         </Link>
