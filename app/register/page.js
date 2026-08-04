@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import Header from '../Header';
-import { useTranslations } from '@/lib/locale/LocaleContext';
+import { useLocale, useTranslations } from '@/lib/locale/LocaleContext';
+import { displayScheduleText } from '@/lib/locale/knownScheduleText';
 
 function compressImage(file, maxSize = 300, quality = 0.7) {
   return new Promise((resolve, reject) => {
@@ -37,6 +38,7 @@ function compressImage(file, maxSize = 300, quality = 0.7) {
 const MAX_PHOTO_SIZE_MB = 10;
 
 export default function RegisterPage() {
+  const { locale } = useLocale();
   const t = useTranslations('register');
   const tc = useTranslations('common');
   const STEP_LABELS = [t('stepTrainee'), t('stepParent'), t('stepMedical'), t('stepConsent')];
@@ -330,7 +332,7 @@ export default function RegisterPage() {
                       {a.emoji ? `${a.emoji} ` : ''}{a.name}
                       {a.schedule_text && (
                         <span style={{ display: 'block', fontSize: 12, color: 'var(--text-dim)', fontWeight: 'normal' }}>
-                          {a.schedule_text}
+                          {displayScheduleText(a.schedule_text, locale)}
                         </span>
                       )}
                     </span>

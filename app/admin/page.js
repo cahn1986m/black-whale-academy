@@ -3,9 +3,14 @@
 import { useEffect, useState } from 'react';
 import Header from '../Header';
 import { useLocale, useTranslations } from '@/lib/locale/LocaleContext';
+import { displayScheduleText } from '@/lib/locale/knownScheduleText';
 
 // Seed-data content (activity names/schedules) — database content, never
-// translated, matches whatever the admin would type in themselves.
+// translated, matches whatever the admin would type in themselves. The one
+// exception is schedule_text for these specific seeded activities, which
+// gets a curated display-only translation via displayScheduleText() — see
+// lib/locale/knownScheduleText.js for why that's scoped narrowly to these
+// exact strings rather than being a general translation of DB content.
 const DEFAULT_ACTIVITIES = [
   {
     name: 'السباحة',
@@ -788,7 +793,7 @@ export default function AdminPage() {
               </select>
               <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{t('enrolledCountLabel', { count: a.enrolled_count })}</div>
               {a.schedule_text && (
-                <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{a.schedule_text}</div>
+                <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{displayScheduleText(a.schedule_text, locale)}</div>
               )}
             </div>
             <button className="btn ghost" type="button" onClick={() => deleteActivity(a)} style={{ width: 'auto', padding: '8px 12px', fontSize: 12 }}>
