@@ -818,7 +818,7 @@ export default function AdminPage() {
               placeholder={t('sessionCountPlaceholder')}
               value={packageDraft[a.id]?.sessionCount || ''}
               onChange={(e) => updatePackageDraft(a.id, 'sessionCount', e.target.value)}
-              style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+              style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
             />
             <input
               type="number"
@@ -826,17 +826,19 @@ export default function AdminPage() {
               placeholder={t('pricePlaceholder')}
               value={packageDraft[a.id]?.price || ''}
               onChange={(e) => updatePackageDraft(a.id, 'price', e.target.value)}
-              style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+              style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
             />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <input
               type="number"
               min="1"
               placeholder={t('sessionsPerWeekPlaceholder')}
               value={packageDraft[a.id]?.sessionsPerWeek || ''}
               onChange={(e) => updatePackageDraft(a.id, 'sessionsPerWeek', e.target.value)}
-              style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+              style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
             />
-            <button className="btn secondary" type="button" onClick={() => addPackage(a.id)} style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }}>
+            <button className="btn secondary" type="button" onClick={() => addPackage(a.id)} style={{ width: 'auto', padding: '8px 14px', fontSize: 13, flexShrink: 0 }}>
               {t('addPackageButton')}
             </button>
           </div>

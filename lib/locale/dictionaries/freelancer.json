@@ -7,6 +7,8 @@
     "rememberMe": "تذكرني على هذا الجهاز",
     "loginButton": "دخول",
     "loggingIn": "جاري الدخول...",
+    "navBookSession": "حجز جلسة",
+    "logout": "تسجيل الخروج",
 
     "dashboardSub": "لوحة المدرب المستقل",
     "welcome": "مرحباً {name}",
@@ -82,6 +84,8 @@
     "rememberMe": "Remember me on this device",
     "loginButton": "Log in",
     "loggingIn": "Logging in...",
+    "navBookSession": "Book session",
+    "logout": "Log out",
 
     "dashboardSub": "Freelance coach dashboard",
     "welcome": "Welcome {name}",

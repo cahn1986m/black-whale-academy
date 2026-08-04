@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '../../Header';
-import { useTranslations } from '@/lib/locale/LocaleContext';
+import { useLocale, useTranslations } from '@/lib/locale/LocaleContext';
 
 // Same rgba-tint-plus-solid-color technique already used by
 // .status-pill.present/.absent in globals.css — reused verbatim from
@@ -26,8 +26,10 @@ function statusPillStyle(status) {
 }
 
 export default function StaffFreelancerScanListPage() {
+  const { locale } = useLocale();
   const t = useTranslations('staff');
   const tc = useTranslations('common');
+  const dateLocale = locale === 'en' ? 'en-US' : 'ar-EG';
   const STATUS_LABELS = {
     pending: t('statusPending'),
     approved: t('statusApproved'),
@@ -67,7 +69,7 @@ export default function StaffFreelancerScanListPage() {
               <div>
                 <div style={{ fontWeight: 'bold' }}>{s.freelancer_name}</div>
                 <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>
-                  {new Date(s.session_date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })} — {s.session_time.slice(0, 5)}
+                  {new Date(s.session_date).toLocaleDateString(dateLocale, { day: 'numeric', month: 'long', year: 'numeric' })} — {s.session_time.slice(0, 5)}
                 </div>
               </div>
               <span className="status-pill" style={statusPillStyle(s.status)}>
