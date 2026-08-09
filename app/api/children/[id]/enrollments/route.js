@@ -16,6 +16,7 @@ export async function GET(request, { params }) {
     const enrollments = await sql`
       SELECT e.id, e.activity_id, a.name AS activity_name, a.emoji,
         e.sessions_total, e.price_paid, e.sessions_used_offset, e.expiry_date,
+        e.status, e.status_reason, e.status_changed_at,
         (e.expiry_date IS NOT NULL AND e.expiry_date < CURRENT_DATE) AS date_expired,
         COALESCE(u.used_count, 0) + e.sessions_used_offset AS sessions_used,
         e.sessions_total - COALESCE(u.used_count, 0) - e.sessions_used_offset AS sessions_remaining
@@ -85,13 +86,21 @@ export async function POST(request, { params }) {
         : null;
     }
 
+    // Admin-created/renewed enrollments are always active immediately —
+    // the admin is already trusted, no self-approval loop needed. This
+    // also reactivates an enrollment that was previously pending_approval,
+    // cancelled, or rejected (the UNIQUE(child_id, activity_id) constraint
+    // means a renew on an old activity hits this same UPDATE branch).
     const [enrollment] = await sql`
-      INSERT INTO enrollments (child_id, activity_id, package_id, sessions_total, price_paid)
-      VALUES (${childId}, ${activityId}, ${packageId}, ${sessionsTotal}, ${pricePaid})
+      INSERT INTO enrollments (child_id, activity_id, package_id, sessions_total, price_paid, status, status_changed_at)
+      VALUES (${childId}, ${activityId}, ${packageId}, ${sessionsTotal}, ${pricePaid}, 'active', now())
       ON CONFLICT (child_id, activity_id) DO UPDATE SET
         package_id = EXCLUDED.package_id,
         sessions_total = enrollments.sessions_total + EXCLUDED.sessions_total,
-        price_paid = COALESCE(enrollments.price_paid, 0) + COALESCE(EXCLUDED.price_paid, 0)
+        price_paid = COALESCE(enrollments.price_paid, 0) + COALESCE(EXCLUDED.price_paid, 0),
+        status = 'active',
+        status_reason = NULL,
+        status_changed_at = now()
       RETURNING id, child_id, activity_id, sessions_total, price_paid, sessions_used_offset
     `;
 
@@ -128,11 +137,39 @@ export async function PATCH(request, { params }) {
     const childId = Number(params.id);
     const body = await request.json().catch(() => ({}));
     const activityId = Number(body.activityId);
-    const sessionsUsedOffset = Number(body.sessionsUsedOffset);
 
     if (!activityId) {
       return NextResponse.json({ error: 'النشاط مطلوب' }, { status: 400 });
     }
+
+    // Two distinct intents share this endpoint, keyed on which field the
+    // body carries — the manual-attendance-offset editor (existing) and
+    // the new soft-cancel-with-reason action (an active enrollment ->
+    // cancelled, keeping its row and attendance history intact, unlike
+    // the hard DELETE below which removes everything).
+    if (body.cancelReason !== undefined) {
+      const cancelReason = (body.cancelReason || '').trim();
+      if (!cancelReason) {
+        return NextResponse.json({ error: 'سبب الإلغاء مطلوب' }, { status: 400 });
+      }
+
+      const [enrollment] = await sql`
+        UPDATE enrollments SET
+          status = 'cancelled',
+          status_reason = ${cancelReason},
+          status_changed_at = now()
+        WHERE child_id = ${childId} AND activity_id = ${activityId}
+        RETURNING id, child_id, activity_id, status, status_reason
+      `;
+
+      if (!enrollment) {
+        return NextResponse.json({ error: 'الاشتراك غير موجود' }, { status: 404 });
+      }
+
+      return NextResponse.json({ enrollment });
+    }
+
+    const sessionsUsedOffset = Number(body.sessionsUsedOffset);
     if (Number.isNaN(sessionsUsedOffset) || sessionsUsedOffset < 0) {
       return NextResponse.json({ error: 'عدد الحصص اليدوية غير صحيح' }, { status: 400 });
     }

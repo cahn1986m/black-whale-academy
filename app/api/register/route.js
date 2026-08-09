@@ -131,11 +131,38 @@ export async function POST(request) {
     }
 
     for (const sel of validSelections) {
-      await sql`
-        INSERT INTO enrollments (child_id, activity_id, package_id, sessions_total, price_paid)
-        VALUES (${child.id}, ${sel.activityId}, ${sel.packageId}, ${sel.sessionsTotal}, ${sel.price})
-        ON CONFLICT (child_id, activity_id) DO NOTHING
+      // Public submissions always land as pending_approval — an admin has
+      // to approve before the trainee can actually attend (see
+      // /api/attendance's hard block on non-active status). Not reachable
+      // today (this route always inserts a brand-new children row, so
+      // child_id can never already have a row for this activity_id) but
+      // implemented as an explicit check-then-update rather than relying
+      // on ON CONFLICT DO NOTHING, which would silently drop a legitimate
+      // re-registration attempt if a future change ever lets this route
+      // reuse an existing child_id (e.g. a previously rejected/cancelled
+      // enrollment for the same activity must reopen for review, not be
+      // silently ignored).
+      const [existing] = await sql`
+        SELECT id FROM enrollments WHERE child_id = ${child.id} AND activity_id = ${sel.activityId}
       `;
+      if (existing) {
+        await sql`
+          UPDATE enrollments SET
+            package_id = ${sel.packageId},
+            sessions_total = ${sel.sessionsTotal},
+            price_paid = ${sel.price},
+            status = 'pending_approval',
+            status_reason = NULL,
+            status_changed_at = now(),
+            expiry_date = NULL
+          WHERE id = ${existing.id}
+        `;
+      } else {
+        await sql`
+          INSERT INTO enrollments (child_id, activity_id, package_id, sessions_total, price_paid, status, status_changed_at)
+          VALUES (${child.id}, ${sel.activityId}, ${sel.packageId}, ${sel.sessionsTotal}, ${sel.price}, 'pending_approval', now())
+        `;
+      }
     }
 
     return NextResponse.json({ child });

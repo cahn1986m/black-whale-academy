@@ -13,6 +13,7 @@ export async function GET(request, { params }) {
         parent_full_name, relationship_to_child, parent_phone, parent_email, address,
         has_medical_condition, medical_condition_details,
         is_on_medication, medication_details,
+        has_special_needs, special_needs_details,
         consent_terms_accepted, consent_marketing_photos
       FROM children WHERE id = ${id}
     `;
@@ -47,6 +48,12 @@ export async function PATCH(request, { params }) {
     const isOnMedication = typeof body.isOnMedication === 'boolean' ? body.isOnMedication : null;
     const medicationDetails = (body.medicationDetails || '').trim() || null;
 
+    // Admin-only field — deliberately never surfaced on the scan page, the
+    // manual attendance table, or the QR badge (see the schema migration
+    // notes). Same conditional-details pattern as the medical fields.
+    const hasSpecialNeeds = typeof body.hasSpecialNeeds === 'boolean' ? body.hasSpecialNeeds : null;
+    const specialNeedsDetails = (body.specialNeedsDetails || '').trim() || null;
+
     if (!fullName) {
       return NextResponse.json({ error: 'اسم المتدرب مطلوب' }, { status: 400 });
     }
@@ -58,6 +65,9 @@ export async function PATCH(request, { params }) {
     }
     if (isOnMedication && !medicationDetails) {
       return NextResponse.json({ error: 'الرجاء ذكر تفاصيل الأدوية' }, { status: 400 });
+    }
+    if (hasSpecialNeeds && !specialNeedsDetails) {
+      return NextResponse.json({ error: 'الرجاء ذكر تفاصيل الاحتياجات الخاصة' }, { status: 400 });
     }
 
     const [existing] = await sql`SELECT id FROM children WHERE id = ${id}`;
@@ -79,7 +89,9 @@ export async function PATCH(request, { params }) {
         has_medical_condition = ${hasMedicalCondition},
         medical_condition_details = ${hasMedicalCondition ? medicalConditionDetails : null},
         is_on_medication = ${isOnMedication},
-        medication_details = ${isOnMedication ? medicationDetails : null}
+        medication_details = ${isOnMedication ? medicationDetails : null},
+        has_special_needs = ${hasSpecialNeeds},
+        special_needs_details = ${hasSpecialNeeds ? specialNeedsDetails : null}
       WHERE id = ${id}
       RETURNING
         id, full_name, photo_base64, qr_token,
@@ -87,6 +99,7 @@ export async function PATCH(request, { params }) {
         parent_full_name, relationship_to_child, parent_phone, parent_email, address,
         has_medical_condition, medical_condition_details,
         is_on_medication, medication_details,
+        has_special_needs, special_needs_details,
         consent_terms_accepted, consent_marketing_photos
     `;
 

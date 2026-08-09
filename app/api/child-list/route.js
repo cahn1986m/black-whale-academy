@@ -14,6 +14,7 @@ export async function GET() {
         parent_full_name, relationship_to_child, parent_phone, parent_email, address,
         has_medical_condition, medical_condition_details,
         is_on_medication, medication_details,
+        has_special_needs, special_needs_details,
         consent_terms_accepted, consent_marketing_photos
       FROM children
       ORDER BY id ASC

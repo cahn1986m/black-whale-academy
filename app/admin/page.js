@@ -125,6 +125,11 @@ export default function AdminPage() {
   const [pendingSessionDetails, setPendingSessionDetails] = useState({});
   const [levelDefaultPricing, setLevelDefaultPricing] = useState([]);
 
+  const [pendingRegistrations, setPendingRegistrations] = useState([]);
+  const [loadingPendingRegistrations, setLoadingPendingRegistrations] = useState(true);
+  const [pendingRegistrationsError, setPendingRegistrationsError] = useState('');
+  const [processingRegistrationChildId, setProcessingRegistrationChildId] = useState(null);
+
   const [expandedChildId, setExpandedChildId] = useState(null);
   const [childEnrollments, setChildEnrollments] = useState([]);
   const [loadingEnrollments, setLoadingEnrollments] = useState(false);
@@ -211,6 +216,25 @@ export default function AdminPage() {
 
   useEffect(() => {
     loadPendingSessions();
+  }, []);
+
+  const loadPendingRegistrations = async () => {
+    setLoadingPendingRegistrations(true);
+    setPendingRegistrationsError('');
+    try {
+      const res = await fetch('/api/admin/pending-registrations', { cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || tc('error'));
+      setPendingRegistrations(data.registrations || []);
+    } catch (err) {
+      setPendingRegistrationsError(err.message);
+    } finally {
+      setLoadingPendingRegistrations(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPendingRegistrations();
   }, []);
 
   const addActivity = async (e) => {
@@ -435,6 +459,8 @@ export default function AdminPage() {
       medicalConditionDetails: c.medical_condition_details || '',
       isOnMedication: c.is_on_medication,
       medicationDetails: c.medication_details || '',
+      hasSpecialNeeds: c.has_special_needs,
+      specialNeedsDetails: c.special_needs_details || '',
     });
   };
 
@@ -475,6 +501,71 @@ export default function AdminPage() {
     }
     loadEnrollments(childId);
     load();
+  };
+
+  const cancelEnrollmentWithReason = async (childId, activityId) => {
+    const reason = window.prompt(t('cancelReasonPrompt'));
+    if (reason === null) return;
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) return;
+
+    const res = await fetch(`/api/children/${childId}/enrollments`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activityId, cancelReason: trimmedReason }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
+      return;
+    }
+    loadEnrollments(childId);
+    load();
+  };
+
+  const approveRegistration = async (childId) => {
+    setProcessingRegistrationChildId(childId);
+    try {
+      const res = await fetch(`/api/admin/pending-registrations/${childId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || tc('error'));
+      setPendingRegistrations((prev) => prev.filter((r) => r.child_id !== childId));
+      load();
+      if (expandedChildId === childId) loadEnrollments(childId);
+    } catch (err) {
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
+    } finally {
+      setProcessingRegistrationChildId(null);
+    }
+  };
+
+  const rejectRegistration = async (childId) => {
+    const reason = window.prompt(t('rejectReasonPrompt'));
+    if (reason === null) return;
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) return;
+
+    setProcessingRegistrationChildId(childId);
+    try {
+      const res = await fetch(`/api/admin/pending-registrations/${childId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reject', reason: trimmedReason }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || tc('error'));
+      setPendingRegistrations((prev) => prev.filter((r) => r.child_id !== childId));
+      load();
+      if (expandedChildId === childId) loadEnrollments(childId);
+    } catch (err) {
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
+    } finally {
+      setProcessingRegistrationChildId(null);
+    }
   };
 
   const resetAllData = async () => {
@@ -630,6 +721,28 @@ export default function AdminPage() {
   const enrolledActivityIds = new Set(childEnrollments.map((e) => e.activity_id));
   const availableForEnroll = activities.filter((a) => !enrolledActivityIds.has(a.id) && a.packages?.length > 0);
   const packagesForSelectedActivity = activities.find((a) => a.id === Number(addEnrollActivityId))?.packages || [];
+
+  // Grouped by trainee — approving/rejecting is one decision about the
+  // trainee's legitimacy, not a per-activity one, even when the same
+  // trainee registered for several activities in the same submission.
+  const pendingRegistrationsByChild = [];
+  {
+    const byChild = new Map();
+    for (const r of pendingRegistrations) {
+      if (!byChild.has(r.child_id)) {
+        byChild.set(r.child_id, {
+          childId: r.child_id,
+          fullName: r.full_name,
+          photoBase64: r.photo_base64,
+          parentFullName: r.parent_full_name,
+          parentPhone: r.parent_phone,
+          activities: [],
+        });
+        pendingRegistrationsByChild.push(byChild.get(r.child_id));
+      }
+      byChild.get(r.child_id).activities.push(r);
+    }
+  }
 
   return (
     <div className="page">
@@ -1023,6 +1136,40 @@ export default function AdminPage() {
                       </div>
                     )}
 
+                    <div className="field">
+                      <label>{t('hasSpecialNeedsLabel')}</label>
+                      <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            type="radio"
+                            name={`hasSpecialNeeds-${c.id}`}
+                            checked={infoDraft.hasSpecialNeeds === true}
+                            onChange={() => setInfoDraft((d) => ({ ...d, hasSpecialNeeds: true }))}
+                          />
+                          {tc('yes')}
+                        </label>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            type="radio"
+                            name={`hasSpecialNeeds-${c.id}`}
+                            checked={infoDraft.hasSpecialNeeds === false}
+                            onChange={() => setInfoDraft((d) => ({ ...d, hasSpecialNeeds: false, specialNeedsDetails: '' }))}
+                          />
+                          {tc('no')}
+                        </label>
+                      </div>
+                    </div>
+                    {infoDraft.hasSpecialNeeds === true && (
+                      <div className="field">
+                        <label>{t('specialNeedsDetailsLabel')}</label>
+                        <input
+                          type="text"
+                          value={infoDraft.specialNeedsDetails}
+                          onChange={(e) => setInfoDraft((d) => ({ ...d, specialNeedsDetails: e.target.value }))}
+                        />
+                      </div>
+                    )}
+
                     <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                       <button className="btn secondary" type="button" onClick={cancelEditInfo} style={{ flex: 1 }}>{tc('cancel')}</button>
                       <button className="btn" type="button" onClick={() => saveInfo(c.id)} disabled={savingInfo} style={{ flex: 1 }}>
@@ -1049,6 +1196,10 @@ export default function AdminPage() {
                         <span>{t('isOnMedicationQuestion')}</span> <BoolBadge value={c.is_on_medication} yesLabel={tc('yes')} noLabel={tc('no')} notAskedLabel={t('notAskedYet')} />
                       </div>
                       {c.is_on_medication && <div style={{ color: 'var(--text-dim)' }}>{c.medication_details}</div>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, marginBottom: 4 }}>
+                        <span>{t('specialNeedsQuestion')}</span> <BoolBadge value={c.has_special_needs} yesLabel={tc('yes')} noLabel={tc('no')} notAskedLabel={t('notAskedYet')} />
+                      </div>
+                      {c.has_special_needs && <div style={{ color: 'var(--text-dim)' }}>{c.special_needs_details}</div>}
                     </div>
                     <div style={{ marginTop: 4, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -1071,7 +1222,7 @@ export default function AdminPage() {
                 const packages = activity?.packages || [];
                 return (
                   <div key={e.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', rowGap: 6 }}>
                       <div>
                         <div style={{ fontWeight: 'bold' }}>{e.emoji ? `${e.emoji} ` : ''}{e.activity_name}</div>
                         <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
@@ -1079,13 +1230,30 @@ export default function AdminPage() {
                           {e.price_paid != null ? ` — ${e.price_paid} ${tc('currencyAed')}` : ''}
                           {e.expiry_date ? ` — ${t('expiresOn', { date: formatDate(e.expiry_date, dateLocale) })}` : ''}
                         </div>
+                        {e.status !== 'active' && e.status_reason && (
+                          <div style={{ fontSize: 12, color: '#b45309', marginTop: 2 }}>{t('statusReasonLine', { reason: e.status_reason })}</div>
+                        )}
                       </div>
-                      <span
-                        className={`status-pill ${e.date_expired || e.sessions_remaining <= 0 ? 'absent' : 'present'}`}
-                        style={{ marginInlineStart: 'auto', marginInlineEnd: 8 }}
-                      >
-                        {e.date_expired ? t('timeExpiredStatus') : e.sessions_remaining > 0 ? t('remainingStatus', { count: e.sessions_remaining }) : t('sessionsExpiredStatus')}
-                      </span>
+                      {e.status === 'pending_approval' ? (
+                        <span className="status-pill" style={{ background: 'rgba(234,179,8,0.18)', color: '#b45309', marginInlineStart: 'auto', marginInlineEnd: 8 }}>
+                          {t('statusPendingApproval')}
+                        </span>
+                      ) : e.status === 'cancelled' ? (
+                        <span className="status-pill absent" style={{ marginInlineStart: 'auto', marginInlineEnd: 8 }}>
+                          {t('statusCancelled')}
+                        </span>
+                      ) : e.status === 'rejected' ? (
+                        <span className="status-pill absent" style={{ marginInlineStart: 'auto', marginInlineEnd: 8 }}>
+                          {t('statusRejected')}
+                        </span>
+                      ) : (
+                        <span
+                          className={`status-pill ${e.date_expired || e.sessions_remaining <= 0 ? 'absent' : 'present'}`}
+                          style={{ marginInlineStart: 'auto', marginInlineEnd: 8 }}
+                        >
+                          {e.date_expired ? t('timeExpiredStatus') : e.sessions_remaining > 0 ? t('remainingStatus', { count: e.sessions_remaining }) : t('sessionsExpiredStatus')}
+                        </span>
+                      )}
                       <button
                         className="btn ghost"
                         type="button"
@@ -1109,6 +1277,16 @@ export default function AdminPage() {
                       >
                         {t('manualCheckButton')}
                       </button>
+                      {e.status === 'active' && (
+                        <button
+                          className="btn ghost"
+                          type="button"
+                          onClick={() => cancelEnrollmentWithReason(c.id, e.activity_id)}
+                          style={{ width: 'auto', padding: '6px 10px', fontSize: 11, marginInlineStart: 6, color: 'var(--absent)' }}
+                        >
+                          {t('cancelWithReasonButton')}
+                        </button>
+                      )}
                       <button className="btn ghost" type="button" onClick={() => unenroll(c.id, e.activity_id)} style={{ width: 'auto', padding: '6px 10px', fontSize: 11, marginInlineStart: 6 }}>
                         {t('unenrollButton')}
                       </button>
@@ -1211,6 +1389,59 @@ export default function AdminPage() {
       <a href="/admin/instructors" className="btn" style={{ display: 'flex', marginTop: 12 }}>
         {t('manageInstructorsLink')}
       </a>
+
+      <a href="/admin/reports" className="btn" style={{ display: 'flex', marginTop: 12 }}>
+        {t('reportsLink')}
+      </a>
+
+      <div className="card" style={{ marginTop: 14 }}>
+        <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('pendingRegistrationsTitle')}</div>
+
+        {pendingRegistrationsError && <div className="msg error">{pendingRegistrationsError}</div>}
+        {loadingPendingRegistrations && <div className="empty">{tc('loading')}</div>}
+        {!loadingPendingRegistrations && !pendingRegistrationsError && pendingRegistrationsByChild.length === 0 && (
+          <div className="empty">{t('noPendingRegistrations')}</div>
+        )}
+
+        {!loadingPendingRegistrations && pendingRegistrationsByChild.map((group) => (
+          <div key={group.childId} style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+            {group.photoBase64 ? (
+              <img src={group.photoBase64} alt={group.fullName} style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+            ) : (
+              <div className="child-avatar-fallback" style={{ flexShrink: 0 }}>🧒</div>
+            )}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 'bold' }}>{group.fullName}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                {t('parentContactLine', { name: group.parentFullName || '—', phone: group.parentPhone || '—' })}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>
+                {group.activities.map((a) => `${a.emoji ? a.emoji + ' ' : ''}${a.activity_name}`).join(' · ')}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => approveRegistration(group.childId)}
+                  disabled={processingRegistrationChildId === group.childId}
+                  style={{ width: 'auto', padding: '8px 14px', fontSize: 13, borderColor: 'var(--present)', color: 'var(--present)' }}
+                >
+                  {processingRegistrationChildId === group.childId ? t('approving') : t('approveButton')}
+                </button>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() => rejectRegistration(group.childId)}
+                  disabled={processingRegistrationChildId === group.childId}
+                  style={{ width: 'auto', padding: '8px 14px', fontSize: 13, borderColor: 'var(--absent)', color: 'var(--absent)' }}
+                >
+                  {processingRegistrationChildId === group.childId ? t('rejecting') : t('rejectButton')}
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
 
       <div className="card" style={{ marginTop: 14 }}>
         <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('freelancerRequests')}</div>

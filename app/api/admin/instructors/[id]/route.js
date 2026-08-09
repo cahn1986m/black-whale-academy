@@ -68,6 +68,14 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: 'قيمة active غير صالحة' }, { status: 400 });
   }
 
+  let deactivationReason = null;
+  if (hasActive && body.active === false) {
+    deactivationReason = typeof body.deactivation_reason === 'string' ? body.deactivation_reason.trim() : '';
+    if (!deactivationReason) {
+      return NextResponse.json({ error: 'سبب التعطيل مطلوب' }, { status: 400 });
+    }
+  }
+
   if (touchesPayFields) {
     if (!hasPayType || !VALID_PAY_TYPES.includes(body.pay_type)) {
       return NextResponse.json(
@@ -120,7 +128,8 @@ export async function PATCH(request, { params }) {
       default_rate_per_day = CASE WHEN ${touchesPayFields} THEN ${touchesPayFields ? defaultRatePerDay : null} ELSE default_rate_per_day END,
       monthly_salary = CASE WHEN ${touchesPayFields} THEN ${touchesPayFields ? monthlySalary : null} ELSE monthly_salary END,
       monthly_absence_deduction = CASE WHEN ${touchesPayFields} THEN ${touchesPayFields ? monthlyAbsenceDeduction : null} ELSE monthly_absence_deduction END,
-      active = CASE WHEN ${hasActive} THEN ${hasActive ? body.active : null} ELSE active END
+      active = CASE WHEN ${hasActive} THEN ${hasActive ? body.active : null} ELSE active END,
+      deactivation_reason = CASE WHEN ${hasActive} THEN ${deactivationReason} ELSE deactivation_reason END
     WHERE id = ${instructorId}
     RETURNING id
   `;

@@ -226,7 +226,44 @@
 
     "resetAllConfirmPrompt": "هاد الإجراء رح يمسح كل المتدربين والأنشطة والاشتراكات وسجلات الحضور نهائياً ومايمكن التراجع. للتأكيد، اكتب بالضبط: DELETE ALL",
     "resetAllTextMismatch": "النص غير مطابق. تم الإلغاء.",
-    "resetAllSuccess": "تم حذف كل البيانات بنجاح."
+    "resetAllSuccess": "تم حذف كل البيانات بنجاح.",
+
+    "pendingRegistrationsTitle": "التسجيلات الجديدة بانتظار الموافقة",
+    "noPendingRegistrations": "لا يوجد تسجيلات معلّقة حالياً",
+    "parentContactLine": "ولي الأمر: {name} — {phone}",
+    "approving": "جاري الموافقة...",
+    "rejecting": "جاري الرفض...",
+
+    "cancelWithReasonButton": "إلغاء مع سبب",
+    "cancelReasonPrompt": "اكتب سبب إلغاء الاشتراك",
+    "statusPendingApproval": "قيد المراجعة",
+    "statusCancelled": "ملغى",
+    "statusRejected": "مرفوض",
+    "statusReasonLine": "السبب: {reason}",
+
+    "hasSpecialNeedsLabel": "هل عند المتدرب احتياجات خاصة؟",
+    "specialNeedsDetailsLabel": "تفاصيل الاحتياجات الخاصة",
+    "specialNeedsQuestion": "احتياجات خاصة؟",
+
+    "entrySessionPay": "حضور يوم",
+    "entryDeduction": "خصم",
+    "entryMonthlySalary": "راتب شهري",
+
+    "deactivationReasonPrompt": "اكتب سبب التعطيل",
+    "deactivationReasonRequired": "سبب التعطيل مطلوب. تم الإلغاء.",
+    "deactivationReasonLine": "سبب التعطيل: {reason}",
+
+    "reportsLink": "📊 التقارير",
+    "reportsTitle": "التقارير",
+    "ageDistributionTitle": "توزيع الأعمار",
+    "genderDistributionTitle": "توزيع الجنس",
+    "nationalityDistributionTitle": "توزيع الجنسيات",
+    "enrollmentsByActivityTitle": "عدد المسجلين لكل نشاط",
+    "financialSummaryTitle": "ملخص مالي (حسب النشاط)",
+    "unknownLabel": "غير محدد",
+    "totalRevenueLabel": "الإجمالي",
+    "loadingReports": "جاري تحميل التقارير...",
+    "ageYearsSuffix": "سنة"
   },
   "en": {
     "loginSub": "Admin login",
@@ -455,6 +492,43 @@
 
     "resetAllConfirmPrompt": "This will permanently delete all trainees, activities, enrollments, and attendance records — this cannot be undone. To confirm, type exactly: DELETE ALL",
     "resetAllTextMismatch": "Text doesn't match. Cancelled.",
-    "resetAllSuccess": "All data deleted successfully."
+    "resetAllSuccess": "All data deleted successfully.",
+
+    "pendingRegistrationsTitle": "New registrations awaiting approval",
+    "noPendingRegistrations": "No pending registrations right now",
+    "parentContactLine": "Parent: {name} — {phone}",
+    "approving": "Approving...",
+    "rejecting": "Rejecting...",
+
+    "cancelWithReasonButton": "Cancel with reason",
+    "cancelReasonPrompt": "Enter the reason for cancelling this enrollment",
+    "statusPendingApproval": "Pending review",
+    "statusCancelled": "Cancelled",
+    "statusRejected": "Rejected",
+    "statusReasonLine": "Reason: {reason}",
+
+    "hasSpecialNeedsLabel": "Does the trainee have special needs?",
+    "specialNeedsDetailsLabel": "Special needs details",
+    "specialNeedsQuestion": "Special needs?",
+
+    "entrySessionPay": "Session pay",
+    "entryDeduction": "Deduction",
+    "entryMonthlySalary": "Monthly salary",
+
+    "deactivationReasonPrompt": "Enter the reason for deactivating this account",
+    "deactivationReasonRequired": "Deactivation reason is required. Cancelled.",
+    "deactivationReasonLine": "Deactivation reason: {reason}",
+
+    "reportsLink": "📊 Reports",
+    "reportsTitle": "Reports",
+    "ageDistributionTitle": "Age distribution",
+    "genderDistributionTitle": "Gender distribution",
+    "nationalityDistributionTitle": "Nationality distribution",
+    "enrollmentsByActivityTitle": "Enrollments per activity",
+    "financialSummaryTitle": "Financial summary (by activity)",
+    "unknownLabel": "Unknown",
+    "totalRevenueLabel": "Total",
+    "loadingReports": "Loading reports...",
+    "ageYearsSuffix": "yrs"
   }
 }

@@ -18,7 +18,7 @@ export async function GET(request) {
     const rows = activityId
       ? await sql`
           SELECT e.id AS enrollment_id, c.id AS child_id, c.full_name, c.photo_base64,
-            e.sessions_total, e.expiry_date,
+            e.sessions_total, e.expiry_date, e.status AS enrollment_status,
             (e.expiry_date IS NOT NULL AND e.expiry_date < CURRENT_DATE) AS date_expired,
             COALESCE(u.used_count, 0) + e.sessions_used_offset AS sessions_used,
             e.sessions_total - COALESCE(u.used_count, 0) - e.sessions_used_offset AS sessions_remaining,
@@ -32,7 +32,7 @@ export async function GET(request) {
             WHERE status = 'present'
             GROUP BY enrollment_id
           ) u ON u.enrollment_id = e.id
-          WHERE e.activity_id = ${Number(activityId)}
+          WHERE e.activity_id = ${Number(activityId)} AND e.status IN ('active', 'pending_approval')
           ORDER BY c.full_name ASC
         `
       : await sql`
@@ -42,6 +42,7 @@ export async function GET(request) {
           JOIN children c ON c.id = e.child_id
           JOIN activities a ON a.id = e.activity_id
           LEFT JOIN activity_attendance aa ON aa.enrollment_id = e.id AND aa.attendance_date = ${date}
+          WHERE e.status IN ('active', 'pending_approval')
           ORDER BY a.name ASC, c.full_name ASC
         `;
 
@@ -101,6 +102,31 @@ export async function POST(request) {
       }
       enrollmentId = enrollment.id;
     }
+
+    // --- Hard approval gate — deliberately separate from (and checked
+    // strictly before) the sessions-remaining/date-expiry warnings further
+    // down. Those two warn-but-allow, per this app's long-standing
+    // "attendance is never blocked" rule. This is the one deliberate
+    // exception to that rule: an enrollment that isn't active (not yet
+    // approved, or cancelled/rejected since) must never produce a real
+    // attendance row — QR scan and the manual toggle both go through this
+    // same check, since both funnel through this handler.
+    const [enrollmentStatusRow] = await sql`SELECT status FROM enrollments WHERE id = ${enrollmentId}`;
+    if (!enrollmentStatusRow) {
+      return NextResponse.json({ error: 'الاشتراك ما عاد موجود بالنظام' }, { status: 404 });
+    }
+    if (enrollmentStatusRow.status !== 'active') {
+      const BLOCK_MESSAGES = {
+        pending_approval: 'قيد المراجعة — تواصل مع الإدارة',
+        cancelled: 'الاشتراك ملغى',
+        rejected: 'الاشتراك مرفوض',
+      };
+      return NextResponse.json(
+        { error: BLOCK_MESSAGES[enrollmentStatusRow.status] || 'الاشتراك غير نشط' },
+        { status: 403 }
+      );
+    }
+    // --- end hard approval gate
 
     let record;
     try {

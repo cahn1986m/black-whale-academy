@@ -11,7 +11,7 @@ export async function GET(request, { params }) {
   const [freelancer] = await sql`
     SELECT
       f.id, f.name, f.phone, f.failed_login_attempts, f.locked_until, f.payment_type,
-      f.is_active, f.created_at, COALESCE(fb.current_balance, 0) AS current_balance
+      f.is_active, f.deactivation_reason, f.created_at, COALESCE(fb.current_balance, 0) AS current_balance
     FROM freelancers f
     LEFT JOIN freelancer_balances fb ON fb.freelancer_id = f.id
     WHERE f.id = ${freelancerId}
@@ -51,6 +51,14 @@ export async function PATCH(request, { params }) {
     return NextResponse.json({ error: 'قيمة is_active غير صالحة' }, { status: 400 });
   }
 
+  let deactivationReason = null;
+  if (hasIsActive && body.is_active === false) {
+    deactivationReason = typeof body.deactivation_reason === 'string' ? body.deactivation_reason.trim() : '';
+    if (!deactivationReason) {
+      return NextResponse.json({ error: 'سبب التعطيل مطلوب' }, { status: 400 });
+    }
+  }
+
   if (!hasPaymentType && !hasIsActive) {
     return NextResponse.json({ error: 'لا يوجد أي تعديل مطلوب' }, { status: 400 });
   }
@@ -63,13 +71,13 @@ export async function PATCH(request, { params }) {
   if (hasPaymentType && hasIsActive) {
     await sql`
       UPDATE freelancers
-      SET payment_type = ${body.payment_type}, is_active = ${body.is_active}
+      SET payment_type = ${body.payment_type}, is_active = ${body.is_active}, deactivation_reason = ${deactivationReason}
       WHERE id = ${freelancerId}
     `;
   } else if (hasPaymentType) {
     await sql`UPDATE freelancers SET payment_type = ${body.payment_type} WHERE id = ${freelancerId}`;
   } else {
-    await sql`UPDATE freelancers SET is_active = ${body.is_active} WHERE id = ${freelancerId}`;
+    await sql`UPDATE freelancers SET is_active = ${body.is_active}, deactivation_reason = ${deactivationReason} WHERE id = ${freelancerId}`;
   }
 
   return NextResponse.json({ success: true });

@@ -246,18 +246,31 @@ export default function AdminFreelancersPage() {
 
   const toggleActive = async (freelancer) => {
     const nextActive = !freelancer.is_active;
+    let deactivationReason = null;
+
+    if (!nextActive) {
+      const reason = window.prompt(t('deactivationReasonPrompt'));
+      if (reason === null) return;
+      const trimmedReason = reason.trim();
+      if (!trimmedReason) {
+        alert(t('deactivationReasonRequired'));
+        return;
+      }
+      deactivationReason = trimmedReason;
+    }
+
     try {
       const res = await fetch(`/api/admin/freelancers/${freelancer.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: nextActive }),
+        body: JSON.stringify({ is_active: nextActive, deactivation_reason: deactivationReason }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || tc('error'));
-      setFreelancers((prev) => prev.map((f) => (f.id === freelancer.id ? { ...f, is_active: nextActive } : f)));
+      setFreelancers((prev) => prev.map((f) => (f.id === freelancer.id ? { ...f, is_active: nextActive, deactivation_reason: deactivationReason } : f)));
       setFreelancerDetail((prev) =>
         prev && prev.freelancer.id === freelancer.id
-          ? { ...prev, freelancer: { ...prev.freelancer, is_active: nextActive } }
+          ? { ...prev, freelancer: { ...prev.freelancer, is_active: nextActive, deactivation_reason: deactivationReason } }
           : prev
       );
     } catch (err) {
@@ -460,6 +473,11 @@ export default function AdminFreelancersPage() {
                         {freelancerDetail.freelancer.is_active ? t('disableAccount') : t('enableAccount')}
                       </button>
                     </div>
+                    {!freelancerDetail.freelancer.is_active && freelancerDetail.freelancer.deactivation_reason && (
+                      <div style={{ fontSize: 12, color: '#b45309', marginBottom: 12 }}>
+                        {t('deactivationReasonLine', { reason: freelancerDetail.freelancer.deactivation_reason })}
+                      </div>
+                    )}
 
                     <div className="field">
                       <label>{t('paymentTypeLabel')}</label>

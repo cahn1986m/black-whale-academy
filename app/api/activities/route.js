@@ -5,9 +5,15 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    // Counts active + pending_approval only — a cancelled/rejected
+    // enrollment shouldn't inflate "X مشترك"/"X enrolled" (that count is
+    // meant to reflect real or pending subscribers), but pending_approval
+    // still counts so the activity stays visible in the /attendance
+    // activity dropdown (staff needs to be able to select it and see why
+    // that trainee is blocked, not have the activity silently disappear).
     const activities = await sql`
       SELECT a.id, a.name, a.emoji, a.instructor_name, a.instructor_id, a.schedule_text,
-        COUNT(DISTINCT e.child_id)::int AS enrolled_count
+        COUNT(DISTINCT e.child_id) FILTER (WHERE e.status IN ('active', 'pending_approval'))::int AS enrolled_count
       FROM activities a
       LEFT JOIN enrollments e ON e.activity_id = a.id
       GROUP BY a.id

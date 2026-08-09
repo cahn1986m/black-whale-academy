@@ -2,11 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import Header from '../../Header';
-import { useTranslations } from '@/lib/locale/LocaleContext';
+import { useLocale, useTranslations } from '@/lib/locale/LocaleContext';
 
 export default function AdminInstructorsPage() {
+  const { locale } = useLocale();
   const t = useTranslations('admin');
   const tc = useTranslations('common');
+  const dateLocale = locale === 'en' ? 'en-US' : 'ar-EG';
+
+  const ENTRY_TYPE_LABELS = {
+    payment: t('entryPayment'),
+    session_pay: t('entrySessionPay'),
+    reversal: t('reverse'),
+    monthly_salary: t('entryMonthlySalary'),
+    deduction: t('entryDeduction'),
+  };
+
   const [instructors, setInstructors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,6 +36,7 @@ export default function AdminInstructorsPage() {
   const [expandedInstructorId, setExpandedInstructorId] = useState(null);
   const [instructorDetail, setInstructorDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [instructorLedger, setInstructorLedger] = useState(null);
 
   const [editForm, setEditForm] = useState({
     name: '',
@@ -36,6 +48,13 @@ export default function AdminInstructorsPage() {
   });
   const [savingEdit, setSavingEdit] = useState(false);
   const [issuingSalary, setIssuingSalary] = useState(false);
+
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [paymentDirection, setPaymentDirection] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentNote, setPaymentNote] = useState('');
+  const [savingPayment, setSavingPayment] = useState(false);
+  const [paymentFormError, setPaymentFormError] = useState('');
 
   const loadAll = async () => {
     setLoading(true);
@@ -132,6 +151,25 @@ export default function AdminInstructorsPage() {
     }
   };
 
+  const loadLedger = async (instructorId) => {
+    try {
+      const res = await fetch(`/api/admin/instructors/${instructorId}/ledger`, { cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || tc('error'));
+      setInstructorLedger({ entries: data.entries, currentBalance: data.currentBalance });
+      setInstructors((prev) =>
+        prev.map((i) => (i.id === instructorId ? { ...i, current_balance: data.currentBalance } : i))
+      );
+      setInstructorDetail((prev) =>
+        prev && prev.instructor.id === instructorId
+          ? { ...prev, instructor: { ...prev.instructor, current_balance: data.currentBalance } }
+          : prev
+      );
+    } catch (err) {
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
+    }
+  };
+
   const loadInstructorDetail = async (instructorId) => {
     setLoadingDetail(true);
     try {
@@ -147,6 +185,7 @@ export default function AdminInstructorsPage() {
         monthly_salary: data.instructor.monthly_salary ?? '',
         monthly_absence_deduction: data.instructor.monthly_absence_deduction ?? '',
       });
+      loadLedger(instructorId);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -158,27 +197,47 @@ export default function AdminInstructorsPage() {
     if (expandedInstructorId === instructorId) {
       setExpandedInstructorId(null);
       setInstructorDetail(null);
+      setInstructorLedger(null);
       return;
     }
     setExpandedInstructorId(instructorId);
     setInstructorDetail(null);
+    setInstructorLedger(null);
+    setShowPaymentForm(false);
+    setPaymentDirection('');
+    setPaymentAmount('');
+    setPaymentNote('');
+    setPaymentFormError('');
     loadInstructorDetail(instructorId);
   };
 
   const toggleActive = async (instructor) => {
     const nextActive = !instructor.active;
+    let deactivationReason = null;
+
+    if (!nextActive) {
+      const reason = window.prompt(t('deactivationReasonPrompt'));
+      if (reason === null) return;
+      const trimmedReason = reason.trim();
+      if (!trimmedReason) {
+        alert(t('deactivationReasonRequired'));
+        return;
+      }
+      deactivationReason = trimmedReason;
+    }
+
     try {
       const res = await fetch(`/api/admin/instructors/${instructor.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: nextActive }),
+        body: JSON.stringify({ active: nextActive, deactivation_reason: deactivationReason }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || tc('error'));
-      setInstructors((prev) => prev.map((i) => (i.id === instructor.id ? { ...i, active: nextActive } : i)));
+      setInstructors((prev) => prev.map((i) => (i.id === instructor.id ? { ...i, active: nextActive, deactivation_reason: deactivationReason } : i)));
       setInstructorDetail((prev) =>
         prev && prev.instructor.id === instructor.id
-          ? { ...prev, instructor: { ...prev.instructor, active: nextActive } }
+          ? { ...prev, instructor: { ...prev.instructor, active: nextActive, deactivation_reason: deactivationReason } }
           : prev
       );
     } catch (err) {
@@ -266,6 +325,68 @@ export default function AdminInstructorsPage() {
       alert(`${t('genericErrorPrefix')}: ${err.message}`);
     } finally {
       setIssuingSalary(false);
+    }
+  };
+
+  const savePayment = async (instructorId) => {
+    setPaymentFormError('');
+    if (paymentDirection !== 'in' && paymentDirection !== 'out') {
+      setPaymentFormError(t('directionRequired'));
+      return;
+    }
+    const amountValue = Number(paymentAmount);
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      setPaymentFormError(t('amountMustBePositive'));
+      return;
+    }
+    const trimmedNote = paymentNote.trim();
+    if (!trimmedNote) {
+      setPaymentFormError(t('noteRequired'));
+      return;
+    }
+    const signedAmount = paymentDirection === 'in' ? amountValue : -amountValue;
+    setSavingPayment(true);
+    try {
+      const res = await fetch(`/api/admin/instructors/${instructorId}/ledger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entryType: 'payment', amount: signedAmount, note: trimmedNote }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || tc('error'));
+      setPaymentDirection('');
+      setPaymentAmount('');
+      setPaymentNote('');
+      setShowPaymentForm(false);
+      loadLedger(instructorId);
+    } catch (err) {
+      setPaymentFormError(err.message);
+    } finally {
+      setSavingPayment(false);
+    }
+  };
+
+  const reverseEntry = async (instructorId, entry) => {
+    const reason = window.prompt(t('reverseReasonPrompt'));
+    if (reason === null) return;
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) return;
+    try {
+      const res = await fetch(`/api/admin/instructors/${instructorId}/ledger`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entryType: 'reversal',
+          amount: -1 * Number(entry.amount),
+          note: trimmedReason,
+          reversedEntryId: entry.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || tc('error'));
+      loadLedger(instructorId);
+    } catch (err) {
+      alert(`${t('genericErrorPrefix')}: ${err.message}`);
     }
   };
 
@@ -389,6 +510,11 @@ export default function AdminInstructorsPage() {
                         {instructorDetail.instructor.active ? t('disableAccount') : t('enableAccount')}
                       </button>
                     </div>
+                    {!instructorDetail.instructor.active && instructorDetail.instructor.deactivation_reason && (
+                      <div style={{ fontSize: 12, color: '#b45309', marginBottom: 12 }}>
+                        {t('deactivationReasonLine', { reason: instructorDetail.instructor.deactivation_reason })}
+                      </div>
+                    )}
 
                     <div className="field">
                       <label>{t('nameLabel')}</label>
@@ -479,6 +605,119 @@ export default function AdminInstructorsPage() {
                         </div>
                       ))
                     )}
+
+                    <div style={{ fontWeight: 'bold', margin: '18px 0 8px' }}>{t('financialRecord')}</div>
+
+                    <button
+                      className="btn secondary"
+                      type="button"
+                      onClick={() => setShowPaymentForm((v) => !v)}
+                      style={{ marginBottom: 12 }}
+                    >
+                      {t('recordPayment')}
+                    </button>
+
+                    {showPaymentForm && (
+                      <div className="card">
+                        {paymentFormError && <div className="msg error">{paymentFormError}</div>}
+                        <div className="field">
+                          <label>{t('directionLabel')}</label>
+                          <select
+                            value={paymentDirection}
+                            onChange={(e) => setPaymentDirection(e.target.value)}
+                          >
+                            <option value="">{t('selectDirection')}</option>
+                            <option value="in">{t('paymentIn')}</option>
+                            <option value="out">{t('paymentOut')}</option>
+                          </select>
+                        </div>
+                        <div className="field">
+                          <label>{t('amountLabel')}</label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={paymentAmount}
+                            onChange={(e) => setPaymentAmount(e.target.value)}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="field">
+                          <label>{t('noteLabel')}</label>
+                          <input
+                            type="text"
+                            value={paymentNote}
+                            onChange={(e) => setPaymentNote(e.target.value)}
+                            placeholder={t('paymentNotePlaceholder')}
+                          />
+                        </div>
+                        <button
+                          className="btn"
+                          type="button"
+                          onClick={() => savePayment(instructorDetail.instructor.id)}
+                          disabled={savingPayment}
+                        >
+                          {savingPayment ? t('saving') : t('save')}
+                        </button>
+                      </div>
+                    )}
+
+                    {!instructorLedger && <div className="empty">{tc('loading')}</div>}
+                    {instructorLedger && instructorLedger.entries.length === 0 && (
+                      <div className="empty">{t('noEntriesYet')}</div>
+                    )}
+                    {instructorLedger && instructorLedger.entries.length > 0 && (() => {
+                      const reversedIds = new Set(
+                        instructorLedger.entries
+                          .filter((e) => e.reversed_entry_id != null)
+                          .map((e) => e.reversed_entry_id)
+                      );
+                      return instructorLedger.entries.map((entry) => (
+                        <div className="card" key={entry.id}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                              <div style={{ fontWeight: 'bold' }}>{ENTRY_TYPE_LABELS[entry.entry_type] || entry.entry_type}</div>
+                              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                                {new Date(entry.created_at).toLocaleString(dateLocale, {
+                                  day: 'numeric',
+                                  month: 'long',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </div>
+                            </div>
+                            <div
+                              style={{
+                                fontWeight: 'bold',
+                                fontSize: 16,
+                                color: Number(entry.amount) < 0 ? 'var(--absent)' : 'var(--present)',
+                              }}
+                            >
+                              {Number(entry.amount).toFixed(2)}
+                            </div>
+                          </div>
+
+                          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>
+                            {t('balanceAfterEntry', { balance: Number(entry.balance_after).toFixed(2) })}
+                          </div>
+
+                          {entry.note && (
+                            <div style={{ fontSize: 13, marginTop: 8 }}>{entry.note}</div>
+                          )}
+
+                          {!reversedIds.has(entry.id) && (
+                            <button
+                              className="btn ghost"
+                              type="button"
+                              onClick={() => reverseEntry(instructorDetail.instructor.id, entry)}
+                              style={{ width: 'auto', padding: '6px 10px', fontSize: 12, marginTop: 8 }}
+                            >
+                              {t('reverse')}
+                            </button>
+                          )}
+                        </div>
+                      ));
+                    })()}
                   </>
                 )}
               </div>

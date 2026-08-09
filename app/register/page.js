@@ -85,6 +85,17 @@ export default function RegisterPage() {
       .catch(() => {});
   }, []);
 
+  // Overrides the inherited site-wide tab title with a page-specific
+  // welcome message. Re-runs on every locale change (including the
+  // initial mount), so it stays correct whether the visitor lands here
+  // directly in either language or toggles languages mid-visit — the
+  // same document.title mechanism setLocale() itself uses in
+  // LocaleContext.js, just scoped to this one page instead of the
+  // generic site title.
+  useEffect(() => {
+    document.title = t('pageTitle');
+  }, [locale, t]);
+
   const toggleActivity = (activityId, checked) => {
     setSelected((prev) => {
       const next = { ...prev };

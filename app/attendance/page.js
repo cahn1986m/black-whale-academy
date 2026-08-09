@@ -160,11 +160,16 @@ export default function AttendancePage() {
   };
 
   const markStatus = async (enrollmentId, status) => {
-    await fetch('/api/attendance', {
+    const res = await fetch('/api/attendance', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enrollmentId, status }),
     });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || tc('error'));
+      return;
+    }
     loadRecords();
   };
 
@@ -403,19 +408,30 @@ export default function AttendancePage() {
                 )}
                 <span className="name">
                   {r.full_name}
-                  {r.date_expired ? (
+                  {r.enrollment_status === 'pending_approval' ? (
+                    <span style={{ display: 'block', fontSize: 11, color: '#b45309' }}>{t('pendingApprovalStatus')}</span>
+                  ) : r.date_expired ? (
                     <span style={{ display: 'block', fontSize: 11, color: 'var(--absent)' }}>{t('timeExpired')}</span>
                   ) : r.sessions_remaining <= 0 ? (
                     <span style={{ display: 'block', fontSize: 11, color: 'var(--absent)' }}>{t('sessionsExpired')}</span>
                   ) : null}
                 </span>
-                <button
-                  type="button"
-                  className={`status-pill ${r.status === 'present' ? 'present' : 'absent'}`}
-                  onClick={() => markStatus(r.enrollment_id, r.status === 'present' ? 'absent' : 'present')}
-                >
-                  {r.status === 'present' ? t('present') : t('absent')}
-                </button>
+                {r.enrollment_status === 'pending_approval' ? (
+                  <span
+                    className="status-pill"
+                    style={{ background: 'rgba(234,179,8,0.18)', color: '#b45309' }}
+                  >
+                    {t('pendingApprovalStatus')}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className={`status-pill ${r.status === 'present' ? 'present' : 'absent'}`}
+                    onClick={() => markStatus(r.enrollment_id, r.status === 'present' ? 'absent' : 'present')}
+                  >
+                    {r.status === 'present' ? t('present') : t('absent')}
+                  </button>
+                )}
               </div>
             ))}
           </div>
