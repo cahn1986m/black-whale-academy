@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Header from '../Header';
 import { useLocale, useTranslations } from '@/lib/locale/LocaleContext';
 import { displayScheduleText } from '@/lib/locale/knownScheduleText';
+import { DAYS_OF_WEEK, ALLOWED_START_HOURS } from '@/lib/businessHours';
 
 // Seed-data content (activity names/schedules) — database content, never
 // translated, matches whatever the admin would type in themselves. The one
@@ -83,6 +84,15 @@ function formatDate(d, dateLocale) {
   return new Date(d).toLocaleDateString(dateLocale, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+const DAY_LABEL_KEYS = {
+  sunday: 'daySunday', monday: 'dayMonday', tuesday: 'dayTuesday', wednesday: 'dayWednesday',
+  thursday: 'dayThursday', friday: 'dayFriday', saturday: 'daySaturday',
+};
+
+function formatTimeShort(t) {
+  return t ? t.slice(0, 5) : t;
+}
+
 function BoolBadge({ value, yesLabel, noLabel, notAskedLabel }) {
   if (value === true) return <span className="status-pill present">{yesLabel}</span>;
   if (value === false) return <span className="status-pill absent">{noLabel}</span>;
@@ -111,6 +121,11 @@ export default function AdminPage() {
   const [instructors, setInstructors] = useState([]);
   const [activityForm, setActivityForm] = useState({ name: '', emoji: '', instructorName: '', scheduleText: '' });
   const [packageDraft, setPackageDraft] = useState({}); // { [activityId]: { sessionCount, price } }
+  const [slotDraft, setSlotDraft] = useState({}); // { [activityId]: { dayOfWeek, startTime } }
+  const [enrollmentSlotIds, setEnrollmentSlotIds] = useState({}); // { [enrollmentId]: number[] }
+  const [editingOverrideActivityId, setEditingOverrideActivityId] = useState(null);
+  const [overrideDraft, setOverrideDraft] = useState('');
+  const [editingSlotsActivityId, setEditingSlotsActivityId] = useState(null);
   const [savingActivity, setSavingActivity] = useState(false);
   const [showActivityDetails, setShowActivityDetails] = useState(false);
   const [seeding, setSeeding] = useState(false);
@@ -374,12 +389,98 @@ export default function AdminPage() {
     load();
   };
 
+  const updateSlotDraft = (activityId, field, value) => {
+    setSlotDraft((prev) => {
+      const current = prev[activityId] || { dayOfWeek: '', startTime: '' };
+      const next = { ...current, [field]: value };
+      if (field === 'dayOfWeek') next.startTime = '';
+      return { ...prev, [activityId]: next };
+    });
+  };
+
+  const addSlot = async (activityId) => {
+    const draft = slotDraft[activityId] || {};
+    if (!draft.dayOfWeek || !draft.startTime) {
+      alert(t('selectDayAndTime'));
+      return;
+    }
+    const res = await fetch(`/api/activities/${activityId}/slots`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dayOfWeek: draft.dayOfWeek, startTime: draft.startTime }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
+      return;
+    }
+    setSlotDraft((prev) => ({ ...prev, [activityId]: { dayOfWeek: '', startTime: '' } }));
+    load();
+  };
+
+  const deleteSlot = async (slot) => {
+    if (!window.confirm(t('deleteSlotConfirm'))) return;
+    const res = await fetch(`/api/slots/${slot.id}`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
+      return;
+    }
+    load();
+    if (expandedChildId) loadEnrollments(expandedChildId);
+  };
+
+  const loadEnrollmentSlots = async (enrollmentId) => {
+    const res = await fetch(`/api/enrollments/${enrollmentId}/slots`, { cache: 'no-store' });
+    const data = await res.json();
+    setEnrollmentSlotIds((prev) => ({ ...prev, [enrollmentId]: data.slotIds || [] }));
+  };
+
+  const toggleSlotAssignment = async (childId, enrollmentId, slotId, assigned) => {
+    const res = assigned
+      ? await fetch(`/api/enrollments/${enrollmentId}/slots?slotId=${slotId}`, { method: 'DELETE' })
+      : await fetch(`/api/enrollments/${enrollmentId}/slots`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slotId }),
+        });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
+      return;
+    }
+    loadEnrollmentSlots(enrollmentId);
+    loadEnrollments(childId);
+  };
+
+  const saveSessionsPerWeekOverride = async (childId, activityId, enrollmentId) => {
+    const value = overrideDraft.trim();
+    if (value !== '' && (!Number.isInteger(Number(value)) || Number(value) <= 0)) {
+      alert(t('sessionsPerWeekInvalid'));
+      return;
+    }
+    const res = await fetch(`/api/children/${childId}/enrollments`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ activityId, sessionsPerWeekOverride: value === '' ? null : Number(value) }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
+      return;
+    }
+    setEditingOverrideActivityId(null);
+    loadEnrollments(childId);
+  };
+
   const loadEnrollments = async (childId) => {
     setLoadingEnrollments(true);
     try {
       const res = await fetch(`/api/children/${childId}/enrollments`, { cache: 'no-store' });
       const data = await res.json();
-      setChildEnrollments(data.enrollments || []);
+      const enrollments = data.enrollments || [];
+      setChildEnrollments(enrollments);
+      enrollments.forEach((e) => loadEnrollmentSlots(e.id));
     } finally {
       setLoadingEnrollments(false);
     }
@@ -520,6 +621,41 @@ export default function AdminPage() {
       return;
     }
     loadEnrollments(childId);
+    load();
+  };
+
+  const archiveChild = async (childId) => {
+    const reason = window.prompt(t('archiveReasonPrompt'));
+    if (reason === null) return;
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
+      alert(t('archiveReasonRequired'));
+      return;
+    }
+    const res = await fetch(`/api/children/${childId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ archiveReason: trimmedReason }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
+      return;
+    }
+    load();
+  };
+
+  const restoreChild = async (childId) => {
+    const res = await fetch(`/api/children/${childId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unarchive: true }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
+      return;
+    }
     load();
   };
 
@@ -960,6 +1096,54 @@ export default function AdminPage() {
               {t('addPackageButton')}
             </button>
           </div>
+
+          <div style={{ fontSize: 13, fontWeight: 'bold', marginTop: 16, marginBottom: 6 }}>{t('timeSlotsTitle')}</div>
+          <div className="tabs" style={{ flexWrap: 'wrap' }}>
+            {DAYS_OF_WEEK.flatMap((day) =>
+              (a.slots || [])
+                .filter((s) => s.day_of_week === day)
+                .map((s) => (
+                  <span className="tab" key={s.id}>
+                    {t(DAY_LABEL_KEYS[s.day_of_week])} {formatTimeShort(s.start_time)}–{formatTimeShort(s.end_time)}{' '}
+                    <button
+                      type="button"
+                      onClick={() => deleteSlot(s)}
+                      style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, marginInlineStart: 4 }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))
+            )}
+            {(!a.slots || a.slots.length === 0) && <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('noSlotsYet')}</span>}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <select
+              value={slotDraft[a.id]?.dayOfWeek || ''}
+              onChange={(e) => updateSlotDraft(a.id, 'dayOfWeek', e.target.value)}
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <option value="">{t('selectDay')}</option>
+              {DAYS_OF_WEEK.map((day) => (
+                <option key={day} value={day}>{t(DAY_LABEL_KEYS[day])}</option>
+              ))}
+            </select>
+            <select
+              value={slotDraft[a.id]?.startTime || ''}
+              onChange={(e) => updateSlotDraft(a.id, 'startTime', e.target.value)}
+              disabled={!slotDraft[a.id]?.dayOfWeek}
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <option value="">{t('selectStartTime')}</option>
+              {(ALLOWED_START_HOURS[slotDraft[a.id]?.dayOfWeek] || []).map((hour) => {
+                const hh = String(hour).padStart(2, '0');
+                return <option key={hour} value={`${hh}:00`}>{hh}:00</option>;
+              })}
+            </select>
+            <button className="btn secondary" type="button" onClick={() => addSlot(a.id)} style={{ width: 'auto', padding: '8px 14px', fontSize: 13, flexShrink: 0 }}>
+              {t('addSlotButton')}
+            </button>
+          </div>
         </div>
       ))}
 
@@ -989,6 +1173,14 @@ export default function AdminPage() {
               <div className="child-avatar-fallback">🧒</div>
             )}
             <span className="name">{c.full_name}</span>
+            {c.archived_at && (
+              <span
+                className="status-pill absent"
+                style={{ marginInlineStart: 8 }}
+              >
+                {t('archivedStatus')}
+              </span>
+            )}
             {hasMissingData(c) && (
               <span
                 className="status-pill"
@@ -1012,17 +1204,43 @@ export default function AdminPage() {
               <div style={{ paddingBottom: 12, marginBottom: 12, borderBottom: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                   <div style={{ fontWeight: 'bold' }}>{t('traineeInfo')}</div>
-                  {editingInfoChildId !== c.id && (
-                    <button
-                      className="btn ghost"
-                      type="button"
-                      onClick={() => startEditInfo(c)}
-                      style={{ width: 'auto', padding: '6px 10px', fontSize: 11 }}
-                    >
-                      {t('editInfo')}
-                    </button>
-                  )}
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {editingInfoChildId !== c.id && (
+                      <button
+                        className="btn ghost"
+                        type="button"
+                        onClick={() => startEditInfo(c)}
+                        style={{ width: 'auto', padding: '6px 10px', fontSize: 11 }}
+                      >
+                        {t('editInfo')}
+                      </button>
+                    )}
+                    {c.archived_at ? (
+                      <button
+                        className="btn ghost"
+                        type="button"
+                        onClick={() => restoreChild(c.id)}
+                        style={{ width: 'auto', padding: '6px 10px', fontSize: 11 }}
+                      >
+                        {t('restoreButton')}
+                      </button>
+                    ) : (
+                      <button
+                        className="btn ghost"
+                        type="button"
+                        onClick={() => archiveChild(c.id)}
+                        style={{ width: 'auto', padding: '6px 10px', fontSize: 11, color: 'var(--absent)' }}
+                      >
+                        {t('archiveButton')}
+                      </button>
+                    )}
+                  </div>
                 </div>
+                {c.archived_at && (
+                  <div style={{ fontSize: 12, color: '#b45309', marginBottom: 8 }}>
+                    {t('archivedReasonLine', { reason: c.archived_reason })}
+                  </div>
+                )}
 
                 {editingInfoChildId === c.id ? (
                   <div>
@@ -1277,6 +1495,19 @@ export default function AdminPage() {
                       >
                         {t('manualCheckButton')}
                       </button>
+                      <button
+                        className="btn ghost"
+                        type="button"
+                        onClick={() => {
+                          const next = editingSlotsActivityId === e.activity_id ? null : e.activity_id;
+                          setEditingSlotsActivityId(next);
+                          setEditingOverrideActivityId(null);
+                          setOverrideDraft(next ? (e.sessions_per_week_override != null ? String(e.sessions_per_week_override) : '') : '');
+                        }}
+                        style={{ width: 'auto', padding: '6px 10px', fontSize: 11, marginInlineStart: 6 }}
+                      >
+                        {t('timeSlotsButton')}
+                      </button>
                       {e.status === 'active' && (
                         <button
                           className="btn ghost"
@@ -1331,6 +1562,53 @@ export default function AdminPage() {
                             type="button"
                             onClick={() => saveOffset(c.id, e.activity_id)}
                             style={{ width: 'auto', padding: '8px 14px', fontSize: 13 }}
+                          >
+                            {t('save')}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {editingSlotsActivityId === e.activity_id && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 6 }}>{t('assignedSlotsNote')}</div>
+                        {(activity?.slots || []).length === 0 && (
+                          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('noSlotsYet')}</div>
+                        )}
+                        {DAYS_OF_WEEK.flatMap((day) =>
+                          (activity?.slots || [])
+                            .filter((s) => s.day_of_week === day)
+                            .map((s) => {
+                              const assigned = (enrollmentSlotIds[e.id] || []).includes(s.id);
+                              return (
+                                <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, fontSize: 13 }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={assigned}
+                                    onChange={() => toggleSlotAssignment(c.id, e.id, s.id, assigned)}
+                                  />
+                                  {t(DAY_LABEL_KEYS[s.day_of_week])} {formatTimeShort(s.start_time)}–{formatTimeShort(s.end_time)}
+                                </label>
+                              );
+                            })
+                        )}
+
+                        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 10, marginBottom: 6 }}>
+                          {t('sessionsPerWeekOverrideNote')}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder={t('autoLabel')}
+                            value={overrideDraft}
+                            onChange={(ev) => setOverrideDraft(ev.target.value)}
+                            style={{ flex: 1, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                          />
+                          <button
+                            className="btn secondary"
+                            type="button"
+                            onClick={() => saveSessionsPerWeekOverride(c.id, e.activity_id, e.id)}
+                            style={{ width: 'auto', padding: '8px 14px', fontSize: 13, flexShrink: 0 }}
                           >
                             {t('save')}
                           </button>
@@ -1392,6 +1670,10 @@ export default function AdminPage() {
 
       <a href="/admin/reports" className="btn" style={{ display: 'flex', marginTop: 12 }}>
         {t('reportsLink')}
+      </a>
+
+      <a href="/admin/schedule" className="btn" style={{ display: 'flex', marginTop: 12 }}>
+        {t('scheduleLink')}
       </a>
 
       <div className="card" style={{ marginTop: 14 }}>

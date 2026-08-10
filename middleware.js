@@ -32,6 +32,8 @@ function isProtected(pathname, method) {
   if (pathname === '/api/activities') return method !== 'GET';
   if (pathname.startsWith('/api/activities/')) return true;
   if (pathname.startsWith('/api/packages/')) return true;
+  if (pathname.startsWith('/api/slots/')) return true;
+  if (pathname.startsWith('/api/enrollments/')) return true;
   if (pathname === '/api/child-list') return true;
   if (pathname.startsWith('/api/children/')) return true;
   if (pathname === '/api/admin-password') return true;

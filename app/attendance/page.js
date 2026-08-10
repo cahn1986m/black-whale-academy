@@ -408,7 +408,9 @@ export default function AttendancePage() {
                 )}
                 <span className="name">
                   {r.full_name}
-                  {r.enrollment_status === 'pending_approval' ? (
+                  {r.is_archived ? (
+                    <span style={{ display: 'block', fontSize: 11, color: 'var(--absent)' }}>{t('archivedStatus')}</span>
+                  ) : r.enrollment_status === 'pending_approval' ? (
                     <span style={{ display: 'block', fontSize: 11, color: '#b45309' }}>{t('pendingApprovalStatus')}</span>
                   ) : r.date_expired ? (
                     <span style={{ display: 'block', fontSize: 11, color: 'var(--absent)' }}>{t('timeExpired')}</span>
@@ -416,7 +418,11 @@ export default function AttendancePage() {
                     <span style={{ display: 'block', fontSize: 11, color: 'var(--absent)' }}>{t('sessionsExpired')}</span>
                   ) : null}
                 </span>
-                {r.enrollment_status === 'pending_approval' ? (
+                {r.is_archived ? (
+                  <span className="status-pill absent">
+                    {t('archivedStatus')}
+                  </span>
+                ) : r.enrollment_status === 'pending_approval' ? (
                   <span
                     className="status-pill"
                     style={{ background: 'rgba(234,179,8,0.18)', color: '#b45309' }}

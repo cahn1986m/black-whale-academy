@@ -19,6 +19,7 @@ export async function GET(request) {
       ? await sql`
           SELECT e.id AS enrollment_id, c.id AS child_id, c.full_name, c.photo_base64,
             e.sessions_total, e.expiry_date, e.status AS enrollment_status,
+            (c.archived_at IS NOT NULL) AS is_archived,
             (e.expiry_date IS NOT NULL AND e.expiry_date < CURRENT_DATE) AS date_expired,
             COALESCE(u.used_count, 0) + e.sessions_used_offset AS sessions_used,
             e.sessions_total - COALESCE(u.used_count, 0) - e.sessions_used_offset AS sessions_remaining,
@@ -37,7 +38,8 @@ export async function GET(request) {
         `
       : await sql`
           SELECT e.id AS enrollment_id, a.id AS activity_id, a.name AS activity_name,
-            c.id AS child_id, c.full_name, c.photo_base64, aa.status, aa.marked_at
+            c.id AS child_id, c.full_name, c.photo_base64, aa.status, aa.marked_at,
+            (c.archived_at IS NOT NULL) AS is_archived
           FROM enrollments e
           JOIN children c ON c.id = e.child_id
           JOIN activities a ON a.id = e.activity_id
@@ -103,6 +105,24 @@ export async function POST(request) {
       enrollmentId = enrollment.id;
     }
 
+    if (!childId) {
+      const [enrollment] = await sql`SELECT child_id FROM enrollments WHERE id = ${enrollmentId}`;
+      if (!enrollment) {
+        return NextResponse.json({ error: 'الاشتراك ما عاد موجود بالنظام' }, { status: 404 });
+      }
+      childId = enrollment.child_id;
+    }
+
+    // --- Hard archive gate — child-level, checked before the enrollment
+    // status gate below since it blocks ALL of this child's enrollments
+    // regardless of their individual status, with its own distinct
+    // message (never conflated with "pending review").
+    const [childArchiveRow] = await sql`SELECT archived_at FROM children WHERE id = ${childId}`;
+    if (childArchiveRow?.archived_at) {
+      return NextResponse.json({ error: 'المتدرب مؤرشف — تواصل مع الإدارة' }, { status: 403 });
+    }
+    // --- end hard archive gate
+
     // --- Hard approval gate — deliberately separate from (and checked
     // strictly before) the sessions-remaining/date-expiry warnings further
     // down. Those two warn-but-allow, per this app's long-standing
@@ -144,10 +164,6 @@ export async function POST(request) {
       throw err;
     }
 
-    if (!childId) {
-      const [enrollment] = await sql`SELECT child_id FROM enrollments WHERE id = ${enrollmentId}`;
-      childId = enrollment?.child_id;
-    }
     const [child] = await sql`SELECT id, full_name FROM children WHERE id = ${childId}`;
     const enrollmentStatus = await getEnrollmentStatus(enrollmentId);
 

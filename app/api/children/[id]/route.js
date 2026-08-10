@@ -14,6 +14,7 @@ export async function GET(request, { params }) {
         has_medical_condition, medical_condition_details,
         is_on_medication, medication_details,
         has_special_needs, special_needs_details,
+        archived_at, archived_reason,
         consent_terms_accepted, consent_marketing_photos
       FROM children WHERE id = ${id}
     `;
@@ -32,6 +33,40 @@ export async function PATCH(request, { params }) {
   try {
     const id = Number(params.id);
     const body = await request.json().catch(() => ({}));
+
+    // Archive/restore are distinct intents from the general profile edit
+    // below, keyed on which field the body carries (same pattern as the
+    // enrollments PATCH route's cancelReason/sessionsUsedOffset split).
+    // Archiving is child-level, not per-enrollment — it blocks attendance
+    // for ALL of this child's enrollments regardless of their individual
+    // status, with its own distinct message (see /api/attendance).
+    if (body.archiveReason !== undefined) {
+      const archiveReason = (body.archiveReason || '').trim();
+      if (!archiveReason) {
+        return NextResponse.json({ error: 'سبب الأرشفة مطلوب' }, { status: 400 });
+      }
+      const [child] = await sql`
+        UPDATE children SET archived_at = now(), archived_reason = ${archiveReason}
+        WHERE id = ${id}
+        RETURNING id, archived_at, archived_reason
+      `;
+      if (!child) {
+        return NextResponse.json({ error: 'المتدرب غير موجود' }, { status: 404 });
+      }
+      return NextResponse.json({ child });
+    }
+
+    if (body.unarchive === true) {
+      const [child] = await sql`
+        UPDATE children SET archived_at = NULL, archived_reason = NULL
+        WHERE id = ${id}
+        RETURNING id, archived_at, archived_reason
+      `;
+      if (!child) {
+        return NextResponse.json({ error: 'المتدرب غير موجود' }, { status: 404 });
+      }
+      return NextResponse.json({ child });
+    }
 
     const fullName = (body.fullName || '').trim();
     const dateOfBirth = body.dateOfBirth || null;
@@ -100,6 +135,7 @@ export async function PATCH(request, { params }) {
         has_medical_condition, medical_condition_details,
         is_on_medication, medication_details,
         has_special_needs, special_needs_details,
+        archived_at, archived_reason,
         consent_terms_accepted, consent_marketing_photos
     `;
 

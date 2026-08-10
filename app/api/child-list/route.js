@@ -15,6 +15,7 @@ export async function GET() {
         has_medical_condition, medical_condition_details,
         is_on_medication, medication_details,
         has_special_needs, special_needs_details,
+        archived_at, archived_reason,
         consent_terms_accepted, consent_marketing_photos
       FROM children
       ORDER BY id ASC

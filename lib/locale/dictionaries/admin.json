@@ -263,7 +263,39 @@
     "unknownLabel": "غير محدد",
     "totalRevenueLabel": "الإجمالي",
     "loadingReports": "جاري تحميل التقارير...",
-    "ageYearsSuffix": "سنة"
+    "ageYearsSuffix": "سنة",
+
+    "archiveButton": "أرشفة",
+    "restoreButton": "استرجاع",
+    "archiveReasonPrompt": "اكتب سبب أرشفة المتدرب",
+    "archiveReasonRequired": "سبب الأرشفة مطلوب. تم الإلغاء.",
+    "archivedStatus": "مؤرشف",
+    "archivedReasonLine": "سبب الأرشفة: {reason}",
+
+    "scheduleLink": "🗓️ الجدول الأسبوعي",
+    "scheduleTitle": "الجدول الأسبوعي",
+    "noChildrenAssigned": "لا يوجد متدربين مسجلين بهالخانة",
+
+    "daySunday": "الأحد",
+    "dayMonday": "الإثنين",
+    "dayTuesday": "الثلاثاء",
+    "dayWednesday": "الأربعاء",
+    "dayThursday": "الخميس",
+    "dayFriday": "الجمعة",
+    "daySaturday": "السبت",
+
+    "timeSlotsTitle": "الخانات الزمنية",
+    "noSlotsYet": "ما في خانات زمنية بعد",
+    "selectDay": "اختر اليوم",
+    "selectStartTime": "اختر وقت البداية",
+    "addSlotButton": "+ خانة",
+    "selectDayAndTime": "اختر اليوم ووقت البداية",
+    "deleteSlotConfirm": "حذف هالخانة الزمنية؟ رح ينحذف معها كل تعيينات المتدربين المرتبطة فيها.",
+
+    "timeSlotsButton": "الخانات الزمنية",
+    "assignedSlotsNote": "الخانات الزمنية يلي المتدرب مسجل فيها بهالنشاط",
+    "sessionsPerWeekOverrideNote": "عدد الحصص الأسبوعية الفعلي (يُستخدم بحساب تاريخ الانتهاء) — تلقائياً من عدد الخانات المعيّنة أو الباقة، أو حدد رقم يدوي",
+    "autoLabel": "تلقائي"
   },
   "en": {
     "loginSub": "Admin login",
@@ -529,6 +561,38 @@
     "unknownLabel": "Unknown",
     "totalRevenueLabel": "Total",
     "loadingReports": "Loading reports...",
-    "ageYearsSuffix": "yrs"
+    "ageYearsSuffix": "yrs",
+
+    "archiveButton": "Archive",
+    "restoreButton": "Restore",
+    "archiveReasonPrompt": "Enter the reason for archiving this trainee",
+    "archiveReasonRequired": "Archive reason is required. Cancelled.",
+    "archivedStatus": "Archived",
+    "archivedReasonLine": "Archive reason: {reason}",
+
+    "scheduleLink": "🗓️ Weekly schedule",
+    "scheduleTitle": "Weekly schedule",
+    "noChildrenAssigned": "No trainees assigned to this slot",
+
+    "daySunday": "Sunday",
+    "dayMonday": "Monday",
+    "dayTuesday": "Tuesday",
+    "dayWednesday": "Wednesday",
+    "dayThursday": "Thursday",
+    "dayFriday": "Friday",
+    "daySaturday": "Saturday",
+
+    "timeSlotsTitle": "Time slots",
+    "noSlotsYet": "No time slots yet",
+    "selectDay": "Select day",
+    "selectStartTime": "Select start time",
+    "addSlotButton": "+ Slot",
+    "selectDayAndTime": "Select the day and start time",
+    "deleteSlotConfirm": "Delete this time slot? All trainee assignments linked to it will be removed too.",
+
+    "timeSlotsButton": "Time slots",
+    "assignedSlotsNote": "The time slots this trainee is assigned to for this activity",
+    "sessionsPerWeekOverrideNote": "Actual sessions/week (used for the expiry date) — automatic from assigned slots or the package, or set a manual number",
+    "autoLabel": "Auto"
   }
 }

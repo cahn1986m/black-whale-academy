@@ -24,6 +24,11 @@ export async function GET() {
       FROM activity_packages
       ORDER BY activity_id ASC, session_count ASC
     `;
+    const slots = await sql`
+      SELECT id, activity_id, day_of_week, start_time, end_time
+      FROM activity_time_slots
+      ORDER BY activity_id ASC, day_of_week ASC, start_time ASC
+    `;
 
     const packagesByActivity = new Map();
     for (const pkg of packages) {
@@ -31,10 +36,17 @@ export async function GET() {
       list.push(pkg);
       packagesByActivity.set(pkg.activity_id, list);
     }
+    const slotsByActivity = new Map();
+    for (const slot of slots) {
+      const list = slotsByActivity.get(slot.activity_id) || [];
+      list.push(slot);
+      slotsByActivity.set(slot.activity_id, list);
+    }
 
     const result = activities.map((a) => ({
       ...a,
       packages: packagesByActivity.get(a.id) || [],
+      slots: slotsByActivity.get(a.id) || [],
     }));
 
     return NextResponse.json({ activities: result }, {
