@@ -27,6 +27,11 @@ export async function POST(request) {
     const medicalConditionDetails = (body.medicalConditionDetails || '').trim() || null;
     const isOnMedication = body.isOnMedication;
     const medicationDetails = (body.medicationDetails || '').trim() || null;
+    // Not asked by the regular /register form (stays NULL = never asked,
+    // same as an admin-created trainee) — only /register/special sends
+    // hasSpecialNeeds: true with a required details string.
+    const hasSpecialNeeds = typeof body.hasSpecialNeeds === 'boolean' ? body.hasSpecialNeeds : null;
+    const specialNeedsDetails = (body.specialNeedsDetails || '').trim() || null;
     const consentTermsAccepted = body.consentTermsAccepted === true;
     const consentMarketingPhotos = body.consentMarketingPhotos === true;
 
@@ -65,6 +70,9 @@ export async function POST(request) {
     }
     if (isOnMedication && !medicationDetails) {
       return NextResponse.json({ error: 'الرجاء ذكر تفاصيل الأدوية' }, { status: 400 });
+    }
+    if (hasSpecialNeeds && !specialNeedsDetails) {
+      return NextResponse.json({ error: 'الرجاء ذكر تفاصيل الاحتياجات الخاصة' }, { status: 400 });
     }
     if (!consentTermsAccepted) {
       return NextResponse.json({ error: 'الموافقة على الشروط والأحكام مطلوبة للمتابعة' }, { status: 400 });
@@ -105,6 +113,7 @@ export async function POST(request) {
             parent_full_name, relationship_to_child, parent_email, address,
             has_medical_condition, medical_condition_details,
             is_on_medication, medication_details,
+            has_special_needs, special_needs_details,
             consent_terms_accepted, consent_terms_accepted_at, consent_marketing_photos
           )
           VALUES (
@@ -113,6 +122,7 @@ export async function POST(request) {
             ${parentFullName}, ${relationshipToChild}, ${parentEmail}, ${address},
             ${hasMedicalCondition}, ${medicalConditionDetails},
             ${isOnMedication}, ${medicationDetails},
+            ${hasSpecialNeeds}, ${specialNeedsDetails},
             ${consentTermsAccepted}, now(), ${consentMarketingPhotos}
           )
           RETURNING id, full_name, qr_token

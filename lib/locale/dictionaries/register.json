@@ -59,6 +59,9 @@
     "medicalConditionDetailsLabel": "تفاصيل الحالة الصحية *",
     "isOnMedicationLabel": "هل يتناول المتدرب أدوية بشكل منتظم؟ *",
     "medicationDetailsLabel": "تفاصيل الأدوية *",
+    "specialNeedsDetailsLabel": "تفاصيل الاحتياجات الخاصة للمتدرب *",
+    "specialNeedsDetailsNote": "هاد النموذج مخصص لتسجيل متدربين من ذوي الاحتياجات الخاصة — الرجاء ذكر التفاصيل عشان نقدر نجهز الدعم المناسب.",
+    "errSpecialNeedsDetailsRequired": "الرجاء ذكر تفاصيل الاحتياجات الخاصة",
 
     "consentTermsLabel": "أوافق على الشروط والأحكام الخاصة بأكاديمية الحوت الأسود *",
     "consentMarketingLabel": "أوافق على استخدام صور المتدرب لأغراض التسويق (اختياري)",
@@ -126,6 +129,9 @@
     "medicalConditionDetailsLabel": "Medical condition details *",
     "isOnMedicationLabel": "Does the trainee take medication regularly? *",
     "medicationDetailsLabel": "Medication details *",
+    "specialNeedsDetailsLabel": "Trainee's special needs details *",
+    "specialNeedsDetailsNote": "This form is for registering trainees with special needs — please describe the details so we can prepare the right support.",
+    "errSpecialNeedsDetailsRequired": "Please describe the special needs details",
 
     "consentTermsLabel": "I agree to Black Whale Academy's terms and conditions *",
     "consentMarketingLabel": "I agree to the trainee's photos being used for marketing (optional)",
