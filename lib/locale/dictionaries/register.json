@@ -1,6 +1,6 @@
 {
   "ar": {
-    "pageTitle": "مرحباً بك في أكاديمية الحوت الأسود",
+    "pageTitle": "شكراً لاختيارك أكاديمية الحوت الأسود",
     "formTitle": "نموذج تسجيل متدرب جديد",
     "successTitle": "تم التسجيل بنجاح",
     "stepTrainee": "المتدرب",
@@ -70,7 +70,7 @@
     "submit": "تسجيل"
   },
   "en": {
-    "pageTitle": "Welcome to Black Whale Sports Academy",
+    "pageTitle": "Thank you for choosing Black Whale Sports Academy",
     "formTitle": "New trainee registration form",
     "successTitle": "Registration complete",
     "stepTrainee": "Trainee",
