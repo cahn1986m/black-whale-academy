@@ -272,6 +272,14 @@ export default function RegisterForm() {
   return (
     <div className="page">
       <Header sub={t('formTitle')} />
+
+      <div className="register-hero">
+        <div className="register-hero-bubbles" aria-hidden="true">
+          <span /><span /><span /><span /><span /><span /><span /><span />
+        </div>
+        <p className="register-hero-heading">{t('pageTitle')}</p>
+      </div>
+
       {error && <div className="msg error">{error}</div>}
 
       <div className="tabs" style={{ marginBottom: 14 }}>

@@ -49,6 +49,74 @@ body {
   background-repeat: no-repeat;
 }
 
+/* /register hero band — deliberately its own "Clean Sporty" navy/electric-
+   blue palette, independent of --accent and .bg-decorative's pale cyan
+   wash above. Pure CSS (transform + opacity only, GPU-friendly), no SVG
+   asset, no JS — a handful of circles rising and fading inside a fixed-
+   height, overflow-hidden band so it can never grow taller than the form
+   or push content around. inset-inline-start (not left/right) so the
+   bubble field is direction-agnostic between ar/en with zero extra rules. */
+.register-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, #0b2447 0%, #145da0 60%, #2979ff 100%);
+  padding: 16px;
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.register-hero-heading {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  color: #eaf4ff;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.register-hero-bubbles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.register-hero-bubbles span {
+  position: absolute;
+  bottom: -24px;
+  display: block;
+  border-radius: 50%;
+  background: rgba(234, 244, 255, 0.55);
+  animation: bwa-register-bubble-rise 6.5s ease-in infinite;
+  will-change: transform, opacity;
+}
+
+.register-hero-bubbles span:nth-child(1) { inset-inline-start: 4%;  width: 8px;  height: 8px;  animation-delay: 0s; }
+.register-hero-bubbles span:nth-child(2) { inset-inline-start: 16%; width: 12px; height: 12px; animation-delay: 0.9s; }
+.register-hero-bubbles span:nth-child(3) { inset-inline-start: 30%; width: 7px;  height: 7px;  animation-delay: 1.8s; }
+.register-hero-bubbles span:nth-child(4) { inset-inline-start: 44%; width: 14px; height: 14px; animation-delay: 0.4s; }
+.register-hero-bubbles span:nth-child(5) { inset-inline-start: 58%; width: 9px;  height: 9px;  animation-delay: 2.6s; }
+.register-hero-bubbles span:nth-child(6) { inset-inline-start: 71%; width: 11px; height: 11px; animation-delay: 1.3s; }
+.register-hero-bubbles span:nth-child(7) { inset-inline-start: 85%; width: 8px;  height: 8px;  animation-delay: 3.4s; }
+.register-hero-bubbles span:nth-child(8) { inset-inline-start: 94%; width: 13px; height: 13px; animation-delay: 2s; }
+
+@keyframes bwa-register-bubble-rise {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  10% { opacity: 0.9; }
+  85% { opacity: 0.3; }
+  100% { transform: translateY(-90px) scale(1.25); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .register-hero-bubbles span {
+    animation: none;
+    opacity: 0.35;
+  }
+}
+
 .bg-decor {
   position: fixed;
   inset: 0;
