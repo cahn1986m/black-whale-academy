@@ -29,6 +29,10 @@ export default function HomePage() {
           <span className="emoji">📝</span>
           <span className="label">{t('navRegisterTrainee')}</span>
         </Link>
+        <Link href="/register/special" className="nav-tile">
+          <span className="emoji">🧩</span>
+          <span className="label">{t('navRegisterSpecialNeeds')}</span>
+        </Link>
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
