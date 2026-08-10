@@ -271,6 +271,8 @@
     "archiveReasonRequired": "سبب الأرشفة مطلوب. تم الإلغاء.",
     "archivedStatus": "مؤرشف",
     "archivedReasonLine": "سبب الأرشفة: {reason}",
+    "archivedSectionTitle": "مؤرشف ({count})",
+    "noArchivedTrainees": "ما في متدربين مؤرشفين",
 
     "scheduleLink": "🗓️ الجدول الأسبوعي",
     "scheduleTitle": "الجدول الأسبوعي",
@@ -569,6 +571,8 @@
     "archiveReasonRequired": "Archive reason is required. Cancelled.",
     "archivedStatus": "Archived",
     "archivedReasonLine": "Archive reason: {reason}",
+    "archivedSectionTitle": "Archived ({count})",
+    "noArchivedTrainees": "No archived trainees",
 
     "scheduleLink": "🗓️ Weekly schedule",
     "scheduleTitle": "Weekly schedule",

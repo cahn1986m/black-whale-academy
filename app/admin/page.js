@@ -118,6 +118,8 @@ export default function AdminPage() {
 
   const [activities, setActivities] = useState([]);
   const [children, setChildren] = useState([]);
+  const [archivedChildren, setArchivedChildren] = useState([]);
+  const [archivedSectionOpen, setArchivedSectionOpen] = useState(false);
   const [instructors, setInstructors] = useState([]);
   const [activityForm, setActivityForm] = useState({ name: '', emoji: '', instructorName: '', scheduleText: '' });
   const [packageDraft, setPackageDraft] = useState({}); // { [activityId]: { sessionCount, price } }
@@ -173,16 +175,19 @@ export default function AdminPage() {
   const [savingStaffPassword, setSavingStaffPassword] = useState(false);
 
   const load = async () => {
-    const [aRes, cRes, iRes] = await Promise.all([
+    const [aRes, cRes, acRes, iRes] = await Promise.all([
       fetch('/api/activities', { cache: 'no-store' }),
       fetch('/api/child-list', { cache: 'no-store' }),
+      fetch('/api/child-list?archived=true', { cache: 'no-store' }),
       fetch('/api/admin/instructors', { cache: 'no-store' }),
     ]);
     const aData = await aRes.json();
     const cData = await cRes.json();
+    const acData = await acRes.json();
     const iData = await iRes.json();
     setActivities(aData.activities || []);
     setChildren(cData.children || []);
+    setArchivedChildren(acData.children || []);
     setInstructors(iData.instructors || []);
   };
 
@@ -880,291 +885,7 @@ export default function AdminPage() {
     }
   }
 
-  return (
-    <div className="page">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <a href="/" className="back-link" style={{ marginBottom: 0 }}>← {tc('backHome')}</a>
-        <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
-          <button
-            type="button"
-            onClick={() => setShowPasswordForm((v) => !v)}
-            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
-          >
-            {t('changePasswordButton')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowStaffPasswordForm((v) => !v)}
-            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
-          >
-            {t('staffPasswordButton')}
-          </button>
-          <button
-            type="button"
-            onClick={logout}
-            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
-          >
-            {t('logoutButton')}
-          </button>
-        </div>
-      </div>
-
-      {showPasswordForm && (
-        <div className="card">
-          <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('changePasswordTitle')}</div>
-          {passwordError && <div className="msg error">{passwordError}</div>}
-          <form onSubmit={changePassword}>
-            <div className="field">
-              <label>{t('currentPasswordLabel')}</label>
-              <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>{t('newPasswordLabel')}</label>
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>{t('confirmNewPasswordLabel')}</label>
-              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
-            </div>
-            <button className="btn" type="submit" disabled={savingPassword}>
-              {savingPassword ? t('saving') : t('saveNewPassword')}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {showStaffPasswordForm && (
-        <div className="card">
-          <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('staffPasswordTitle')}</div>
-          {staffPasswordError && <div className="msg error">{staffPasswordError}</div>}
-          <form onSubmit={changeStaffPassword}>
-            <div className="field">
-              <label>{t('newPasswordLabel')}</label>
-              <input type="password" value={staffNewPassword} onChange={(e) => setStaffNewPassword(e.target.value)} />
-            </div>
-            <button className="btn" type="submit" disabled={savingStaffPassword}>
-              {savingStaffPassword ? t('saving') : t('saveStaffPassword')}
-            </button>
-          </form>
-        </div>
-      )}
-
-      <Header sub={t('manageActivitiesTraineesSub')} />
-
-      <button
-        className="btn secondary"
-        type="button"
-        onClick={seedDefaultActivities}
-        disabled={seeding}
-        style={{ marginBottom: 14 }}
-      >
-        {seeding ? t('seedingActivities') : t('seedActivitiesButton')}
-      </button>
-
-      <div className="card">
-        <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('addNewActivity')}</div>
-        {error && <div className="msg error">{error}</div>}
-        <form onSubmit={addActivity}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <div className="field" style={{ flex: 1 }}>
-              <label>{t('activityNameLabel')}</label>
-              <input
-                type="text"
-                value={activityForm.name}
-                onChange={(e) => setActivityForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder={t('activityNamePlaceholder')}
-              />
-            </div>
-            <div className="field" style={{ width: 70 }}>
-              <label>{t('emojiLabel')}</label>
-              <input
-                type="text"
-                value={activityForm.emoji}
-                onChange={(e) => setActivityForm((f) => ({ ...f, emoji: e.target.value }))}
-                placeholder="🏊"
-              />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowActivityDetails((v) => !v)}
-            style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 13, padding: 0, marginBottom: 12, cursor: 'pointer' }}
-          >
-            {showActivityDetails ? t('hideExtraDetails') : t('showExtraDetails')}
-          </button>
-
-          {showActivityDetails && (
-            <>
-              <div className="field">
-                <label>{t('instructorNameOptionalLabel')}</label>
-                <input
-                  type="text"
-                  value={activityForm.instructorName}
-                  onChange={(e) => setActivityForm((f) => ({ ...f, instructorName: e.target.value }))}
-                  placeholder={t('instructorNamePlaceholder')}
-                />
-              </div>
-              <div className="field">
-                <label>{t('scheduleOptionalLabel')}</label>
-                <input
-                  type="text"
-                  value={activityForm.scheduleText}
-                  onChange={(e) => setActivityForm((f) => ({ ...f, scheduleText: e.target.value }))}
-                  placeholder={t('schedulePlaceholder')}
-                />
-              </div>
-            </>
-          )}
-
-          <button className="btn" type="submit" disabled={savingActivity}>
-            {savingActivity ? t('addingActivity') : t('addActivityButton')}
-          </button>
-        </form>
-      </div>
-
-      <div style={{ fontWeight: 'bold', margin: '18px 0 10px' }}>{t('activitiesCount', { count: activities.length })}</div>
-      {activities.length === 0 && <div className="empty">{t('noActivitiesYet')}</div>}
-      {activities.map((a) => (
-        <div className="card" key={a.id}>
-          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <div>
-              <div style={{ fontWeight: 'bold' }}>{a.emoji ? `${a.emoji} ` : ''}{a.name}</div>
-              <select
-                value={a.instructor_id || ''}
-                onChange={(e) => updateActivityInstructor(a.id, e.target.value ? Number(e.target.value) : null)}
-                style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
-              >
-                <option value="">{t('noInstructorAssigned')}</option>
-                {instructors.filter((i) => i.active).map((i) => (
-                  <option key={i.id} value={i.id}>{i.name}</option>
-                ))}
-              </select>
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{t('enrolledCountLabel', { count: a.enrolled_count })}</div>
-              {a.schedule_text && (
-                <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{displayScheduleText(a.schedule_text, locale)}</div>
-              )}
-            </div>
-            <button className="btn ghost" type="button" onClick={() => deleteActivity(a)} style={{ width: 'auto', padding: '8px 12px', fontSize: 12 }}>
-              {tc('delete')}
-            </button>
-          </div>
-
-          <div className="tabs" style={{ marginTop: 12, flexWrap: 'wrap' }}>
-            {a.packages.map((p) => (
-              <span className="tab" key={p.id}>
-                {p.session_count} · {p.price} {tc('currencyAed')}{p.sessions_per_week ? ` · ${p.sessions_per_week}/${locale === 'en' ? 'wk' : 'أسبوع'}` : ''}{' '}
-                <button
-                  type="button"
-                  onClick={() => deletePackage(p)}
-                  style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, marginInlineStart: 4 }}
-                >
-                  ×
-                </button>
-              </span>
-            ))}
-          </div>
-
-          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-            <input
-              type="number"
-              min="1"
-              placeholder={t('sessionCountPlaceholder')}
-              value={packageDraft[a.id]?.sessionCount || ''}
-              onChange={(e) => updatePackageDraft(a.id, 'sessionCount', e.target.value)}
-              style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
-            />
-            <input
-              type="number"
-              min="0"
-              placeholder={t('pricePlaceholder')}
-              value={packageDraft[a.id]?.price || ''}
-              onChange={(e) => updatePackageDraft(a.id, 'price', e.target.value)}
-              style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
-            />
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <input
-              type="number"
-              min="1"
-              placeholder={t('sessionsPerWeekPlaceholder')}
-              value={packageDraft[a.id]?.sessionsPerWeek || ''}
-              onChange={(e) => updatePackageDraft(a.id, 'sessionsPerWeek', e.target.value)}
-              style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
-            />
-            <button className="btn secondary" type="button" onClick={() => addPackage(a.id)} style={{ width: 'auto', padding: '8px 14px', fontSize: 13, flexShrink: 0 }}>
-              {t('addPackageButton')}
-            </button>
-          </div>
-
-          <div style={{ fontSize: 13, fontWeight: 'bold', marginTop: 16, marginBottom: 6 }}>{t('timeSlotsTitle')}</div>
-          <div className="tabs" style={{ flexWrap: 'wrap' }}>
-            {DAYS_OF_WEEK.flatMap((day) =>
-              (a.slots || [])
-                .filter((s) => s.day_of_week === day)
-                .map((s) => (
-                  <span className="tab" key={s.id}>
-                    {t(DAY_LABEL_KEYS[s.day_of_week])} {formatTimeShort(s.start_time)}–{formatTimeShort(s.end_time)}{' '}
-                    <button
-                      type="button"
-                      onClick={() => deleteSlot(s)}
-                      style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, marginInlineStart: 4 }}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))
-            )}
-            {(!a.slots || a.slots.length === 0) && <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('noSlotsYet')}</span>}
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <select
-              value={slotDraft[a.id]?.dayOfWeek || ''}
-              onChange={(e) => updateSlotDraft(a.id, 'dayOfWeek', e.target.value)}
-              style={{ flex: 1, minWidth: 0 }}
-            >
-              <option value="">{t('selectDay')}</option>
-              {DAYS_OF_WEEK.map((day) => (
-                <option key={day} value={day}>{t(DAY_LABEL_KEYS[day])}</option>
-              ))}
-            </select>
-            <select
-              value={slotDraft[a.id]?.startTime || ''}
-              onChange={(e) => updateSlotDraft(a.id, 'startTime', e.target.value)}
-              disabled={!slotDraft[a.id]?.dayOfWeek}
-              style={{ flex: 1, minWidth: 0 }}
-            >
-              <option value="">{t('selectStartTime')}</option>
-              {(ALLOWED_START_HOURS[slotDraft[a.id]?.dayOfWeek] || []).map((hour) => {
-                const hh = String(hour).padStart(2, '0');
-                return <option key={hour} value={`${hh}:00`}>{hh}:00</option>;
-              })}
-            </select>
-            <button className="btn secondary" type="button" onClick={() => addSlot(a.id)} style={{ width: 'auto', padding: '8px 14px', fontSize: 13, flexShrink: 0 }}>
-              {t('addSlotButton')}
-            </button>
-          </div>
-        </div>
-      ))}
-
-      <button className="btn secondary" type="button" onClick={load} style={{ marginTop: 8 }}>
-        {t('refreshLists')}
-      </button>
-      <button
-        className="btn secondary"
-        type="button"
-        onClick={resetAllData}
-        disabled={resetting}
-        style={{ marginTop: 8, marginInlineStart: 8, borderColor: 'var(--absent)', color: 'var(--absent)' }}
-      >
-        {resetting ? t('deletingData') : t('deleteAllData')}
-      </button>
-
-      <div style={{ fontWeight: 'bold', margin: '22px 0 10px' }}>
-        {t('traineesRegisteredCount', { count: children.length })}
-      </div>
-      {children.length === 0 && <div className="empty">{t('noTraineesYet')}</div>}
-      {children.map((c) => (
+  const renderChildRow = (c) => (
         <div key={c.id}>
           <div className="child-row" onClick={() => toggleExpand(c.id)} style={{ cursor: 'pointer' }}>
             {c.photo_base64 ? (
@@ -1658,7 +1379,306 @@ export default function AdminPage() {
             </div>
           )}
         </div>
+  );
+
+  return (
+    <div className="page">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <a href="/" className="back-link" style={{ marginBottom: 0 }}>← {tc('backHome')}</a>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+          <button
+            type="button"
+            onClick={() => setShowPasswordForm((v) => !v)}
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
+          >
+            {t('changePasswordButton')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowStaffPasswordForm((v) => !v)}
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
+          >
+            {t('staffPasswordButton')}
+          </button>
+          <button
+            type="button"
+            onClick={logout}
+            style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 13, cursor: 'pointer' }}
+          >
+            {t('logoutButton')}
+          </button>
+        </div>
+      </div>
+
+      {showPasswordForm && (
+        <div className="card">
+          <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('changePasswordTitle')}</div>
+          {passwordError && <div className="msg error">{passwordError}</div>}
+          <form onSubmit={changePassword}>
+            <div className="field">
+              <label>{t('currentPasswordLabel')}</label>
+              <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>{t('newPasswordLabel')}</label>
+              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />
+            </div>
+            <div className="field">
+              <label>{t('confirmNewPasswordLabel')}</label>
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
+            </div>
+            <button className="btn" type="submit" disabled={savingPassword}>
+              {savingPassword ? t('saving') : t('saveNewPassword')}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {showStaffPasswordForm && (
+        <div className="card">
+          <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('staffPasswordTitle')}</div>
+          {staffPasswordError && <div className="msg error">{staffPasswordError}</div>}
+          <form onSubmit={changeStaffPassword}>
+            <div className="field">
+              <label>{t('newPasswordLabel')}</label>
+              <input type="password" value={staffNewPassword} onChange={(e) => setStaffNewPassword(e.target.value)} />
+            </div>
+            <button className="btn" type="submit" disabled={savingStaffPassword}>
+              {savingStaffPassword ? t('saving') : t('saveStaffPassword')}
+            </button>
+          </form>
+        </div>
+      )}
+
+      <Header sub={t('manageActivitiesTraineesSub')} />
+
+      <button
+        className="btn secondary"
+        type="button"
+        onClick={seedDefaultActivities}
+        disabled={seeding}
+        style={{ marginBottom: 14 }}
+      >
+        {seeding ? t('seedingActivities') : t('seedActivitiesButton')}
+      </button>
+
+      <div className="card">
+        <div style={{ fontWeight: 'bold', marginBottom: 12 }}>{t('addNewActivity')}</div>
+        {error && <div className="msg error">{error}</div>}
+        <form onSubmit={addActivity}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <div className="field" style={{ flex: 1 }}>
+              <label>{t('activityNameLabel')}</label>
+              <input
+                type="text"
+                value={activityForm.name}
+                onChange={(e) => setActivityForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder={t('activityNamePlaceholder')}
+              />
+            </div>
+            <div className="field" style={{ width: 70 }}>
+              <label>{t('emojiLabel')}</label>
+              <input
+                type="text"
+                value={activityForm.emoji}
+                onChange={(e) => setActivityForm((f) => ({ ...f, emoji: e.target.value }))}
+                placeholder="🏊"
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowActivityDetails((v) => !v)}
+            style={{ background: 'none', border: 'none', color: 'var(--accent)', fontSize: 13, padding: 0, marginBottom: 12, cursor: 'pointer' }}
+          >
+            {showActivityDetails ? t('hideExtraDetails') : t('showExtraDetails')}
+          </button>
+
+          {showActivityDetails && (
+            <>
+              <div className="field">
+                <label>{t('instructorNameOptionalLabel')}</label>
+                <input
+                  type="text"
+                  value={activityForm.instructorName}
+                  onChange={(e) => setActivityForm((f) => ({ ...f, instructorName: e.target.value }))}
+                  placeholder={t('instructorNamePlaceholder')}
+                />
+              </div>
+              <div className="field">
+                <label>{t('scheduleOptionalLabel')}</label>
+                <input
+                  type="text"
+                  value={activityForm.scheduleText}
+                  onChange={(e) => setActivityForm((f) => ({ ...f, scheduleText: e.target.value }))}
+                  placeholder={t('schedulePlaceholder')}
+                />
+              </div>
+            </>
+          )}
+
+          <button className="btn" type="submit" disabled={savingActivity}>
+            {savingActivity ? t('addingActivity') : t('addActivityButton')}
+          </button>
+        </form>
+      </div>
+
+      <div style={{ fontWeight: 'bold', margin: '18px 0 10px' }}>{t('activitiesCount', { count: activities.length })}</div>
+      {activities.length === 0 && <div className="empty">{t('noActivitiesYet')}</div>}
+      {activities.map((a) => (
+        <div className="card" key={a.id}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontWeight: 'bold' }}>{a.emoji ? `${a.emoji} ` : ''}{a.name}</div>
+              <select
+                value={a.instructor_id || ''}
+                onChange={(e) => updateActivityInstructor(a.id, e.target.value ? Number(e.target.value) : null)}
+                style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+              >
+                <option value="">{t('noInstructorAssigned')}</option>
+                {instructors.filter((i) => i.active).map((i) => (
+                  <option key={i.id} value={i.id}>{i.name}</option>
+                ))}
+              </select>
+              <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{t('enrolledCountLabel', { count: a.enrolled_count })}</div>
+              {a.schedule_text && (
+                <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 4 }}>{displayScheduleText(a.schedule_text, locale)}</div>
+              )}
+            </div>
+            <button className="btn ghost" type="button" onClick={() => deleteActivity(a)} style={{ width: 'auto', padding: '8px 12px', fontSize: 12 }}>
+              {tc('delete')}
+            </button>
+          </div>
+
+          <div className="tabs" style={{ marginTop: 12, flexWrap: 'wrap' }}>
+            {a.packages.map((p) => (
+              <span className="tab" key={p.id}>
+                {p.session_count} · {p.price} {tc('currencyAed')}{p.sessions_per_week ? ` · ${p.sessions_per_week}/${locale === 'en' ? 'wk' : 'أسبوع'}` : ''}{' '}
+                <button
+                  type="button"
+                  onClick={() => deletePackage(p)}
+                  style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, marginInlineStart: 4 }}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <input
+              type="number"
+              min="1"
+              placeholder={t('sessionCountPlaceholder')}
+              value={packageDraft[a.id]?.sessionCount || ''}
+              onChange={(e) => updatePackageDraft(a.id, 'sessionCount', e.target.value)}
+              style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+            />
+            <input
+              type="number"
+              min="0"
+              placeholder={t('pricePlaceholder')}
+              value={packageDraft[a.id]?.price || ''}
+              onChange={(e) => updatePackageDraft(a.id, 'price', e.target.value)}
+              style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <input
+              type="number"
+              min="1"
+              placeholder={t('sessionsPerWeekPlaceholder')}
+              value={packageDraft[a.id]?.sessionsPerWeek || ''}
+              onChange={(e) => updatePackageDraft(a.id, 'sessionsPerWeek', e.target.value)}
+              style={{ flex: 1, minWidth: 0, padding: '8px 10px', borderRadius: 8, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+            />
+            <button className="btn secondary" type="button" onClick={() => addPackage(a.id)} style={{ width: 'auto', padding: '8px 14px', fontSize: 13, flexShrink: 0 }}>
+              {t('addPackageButton')}
+            </button>
+          </div>
+
+          <div style={{ fontSize: 13, fontWeight: 'bold', marginTop: 16, marginBottom: 6 }}>{t('timeSlotsTitle')}</div>
+          <div className="tabs" style={{ flexWrap: 'wrap' }}>
+            {DAYS_OF_WEEK.flatMap((day) =>
+              (a.slots || [])
+                .filter((s) => s.day_of_week === day)
+                .map((s) => (
+                  <span className="tab" key={s.id}>
+                    {t(DAY_LABEL_KEYS[s.day_of_week])} {formatTimeShort(s.start_time)}–{formatTimeShort(s.end_time)}{' '}
+                    <button
+                      type="button"
+                      onClick={() => deleteSlot(s)}
+                      style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, marginInlineStart: 4 }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))
+            )}
+            {(!a.slots || a.slots.length === 0) && <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('noSlotsYet')}</span>}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <select
+              value={slotDraft[a.id]?.dayOfWeek || ''}
+              onChange={(e) => updateSlotDraft(a.id, 'dayOfWeek', e.target.value)}
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <option value="">{t('selectDay')}</option>
+              {DAYS_OF_WEEK.map((day) => (
+                <option key={day} value={day}>{t(DAY_LABEL_KEYS[day])}</option>
+              ))}
+            </select>
+            <select
+              value={slotDraft[a.id]?.startTime || ''}
+              onChange={(e) => updateSlotDraft(a.id, 'startTime', e.target.value)}
+              disabled={!slotDraft[a.id]?.dayOfWeek}
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <option value="">{t('selectStartTime')}</option>
+              {(ALLOWED_START_HOURS[slotDraft[a.id]?.dayOfWeek] || []).map((hour) => {
+                const hh = String(hour).padStart(2, '0');
+                return <option key={hour} value={`${hh}:00`}>{hh}:00</option>;
+              })}
+            </select>
+            <button className="btn secondary" type="button" onClick={() => addSlot(a.id)} style={{ width: 'auto', padding: '8px 14px', fontSize: 13, flexShrink: 0 }}>
+              {t('addSlotButton')}
+            </button>
+          </div>
+        </div>
       ))}
+
+      <button className="btn secondary" type="button" onClick={load} style={{ marginTop: 8 }}>
+        {t('refreshLists')}
+      </button>
+      <button
+        className="btn secondary"
+        type="button"
+        onClick={resetAllData}
+        disabled={resetting}
+        style={{ marginTop: 8, marginInlineStart: 8, borderColor: 'var(--absent)', color: 'var(--absent)' }}
+      >
+        {resetting ? t('deletingData') : t('deleteAllData')}
+      </button>
+
+      <div style={{ fontWeight: 'bold', margin: '22px 0 10px' }}>
+        {t('traineesRegisteredCount', { count: children.length })}
+      </div>
+      {children.length === 0 && <div className="empty">{t('noTraineesYet')}</div>}
+      {children.map(renderChildRow)}
+
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: '22px 0 10px' }}
+        onClick={() => setArchivedSectionOpen((v) => !v)}
+      >
+        <span style={{ fontWeight: 'bold' }}>{t('archivedSectionTitle', { count: archivedChildren.length })}</span>
+        <span style={{ transition: 'transform 0.15s', transform: archivedSectionOpen ? 'rotate(90deg)' : 'rotate(0deg)', display: 'inline-block' }}>▶</span>
+      </div>
+      {archivedSectionOpen && (
+        archivedChildren.length === 0
+          ? <div className="empty">{t('noArchivedTrainees')}</div>
+          : archivedChildren.map(renderChildRow)
+      )}
 
       <a href="/admin/freelancers" className="btn" style={{ display: 'flex', marginTop: 22 }}>
         {t('manageFreelancersLink')}
