@@ -311,6 +311,183 @@ input, select, textarea {
   font-weight: bold;
 }
 
+/* Home page — scoped container, independent of the shared .page (480px
+   cap used by every other screen) so this redesign can't affect any
+   other page's layout. Single column on mobile (matches .page almost
+   exactly); widens to a real desktop layout above 700px. */
+.home-container {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 20px 16px 60px;
+  min-height: 100vh;
+  position: relative;
+  z-index: 1;
+}
+
+@media (min-width: 700px) {
+  .home-container {
+    max-width: 1000px;
+    padding: 36px 32px 72px;
+  }
+}
+
+/* Real header treatment for the home page only — a scoped descendant
+   selector so the shared Header.js component and its .header class stay
+   untouched for every other page. */
+.home-container .header {
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 6px 12px -10px rgba(10, 14, 39, 0.25);
+}
+
+.home-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+  color: #ffffff;
+  border-radius: var(--radius);
+  padding: 22px 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 20px -8px rgba(29, 78, 216, 0.5);
+}
+
+.home-hero .emoji {
+  font-size: 40px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.home-hero .label {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.home-section-label {
+  font-size: 13px;
+  color: var(--text-dim);
+  font-weight: bold;
+  margin: 22px 0 10px;
+}
+
+.home-nav-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.home-gateway-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 700px) {
+  .home-gateway-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.home-gateway-card {
+  position: relative;
+  display: block;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 16px;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(15, 58, 82, 0.06);
+}
+
+.home-gateway-card .emoji {
+  font-size: 26px;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.home-gateway-card .label {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.home-copy-btn {
+  position: absolute;
+  top: 6px;
+  inset-inline-end: 6px;
+  font-size: 11px;
+  padding: 4px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.home-badge {
+  position: absolute;
+  top: -6px;
+  inset-inline-end: -6px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--absent);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+/* Calm, slow background bubbles for the home page — same rising-circle
+   idea as /register's hero band, deliberately toned down (lower opacity,
+   much slower, spread across the whole viewport instead of one small
+   band) since this is a navigation hub, not a conversion form. Pure CSS
+   (transform + opacity only), independent of .bg-decor's static emoji
+   layer from the root layout, which stays as-is site-wide. */
+.home-bg-bubbles {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home-bg-bubbles span {
+  position: absolute;
+  bottom: -40px;
+  display: block;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.16);
+  animation: bwa-home-bubble-rise 18s ease-in infinite;
+  will-change: transform, opacity;
+}
+
+.home-bg-bubbles span:nth-child(1) { inset-inline-start: 6%;  width: 14px; height: 14px; animation-delay: 0s; }
+.home-bg-bubbles span:nth-child(2) { inset-inline-start: 18%; width: 20px; height: 20px; animation-delay: 3s; }
+.home-bg-bubbles span:nth-child(3) { inset-inline-start: 32%; width: 10px; height: 10px; animation-delay: 6s; }
+.home-bg-bubbles span:nth-child(4) { inset-inline-start: 48%; width: 24px; height: 24px; animation-delay: 1.5s; }
+.home-bg-bubbles span:nth-child(5) { inset-inline-start: 64%; width: 12px; height: 12px; animation-delay: 8s; }
+.home-bg-bubbles span:nth-child(6) { inset-inline-start: 78%; width: 18px; height: 18px; animation-delay: 4.5s; }
+.home-bg-bubbles span:nth-child(7) { inset-inline-start: 90%; width: 13px; height: 13px; animation-delay: 10s; }
+
+@keyframes bwa-home-bubble-rise {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  8% { opacity: 0.7; }
+  92% { opacity: 0.2; }
+  100% { transform: translateY(-115vh) scale(1.4); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-bg-bubbles span {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 .summary-bar {
   display: flex;
   justify-content: space-between;

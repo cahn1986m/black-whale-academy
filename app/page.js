@@ -1,100 +1,105 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import CopyLink from './CopyLink';
 import Header from './Header';
 import { useTranslations } from '@/lib/locale/LocaleContext';
 
 // Hardcoded to the real production domain (not window.location.origin)
-// deliberately — this button must always copy the live, shareable URL
+// deliberately — these buttons must always copy the live, shareable URL
 // regardless of which host the page happens to be viewed from (localhost
 // during dev, a Vercel preview deployment, etc.).
-const SPECIAL_NEEDS_REGISTER_URL = 'https://black-whale-academy-4yj1.vercel.app/register/special';
+const PROD_BASE = 'https://black-whale-academy-4yj1.vercel.app';
+const REGISTER_URL = `${PROD_BASE}/register`;
+const SPECIAL_NEEDS_URL = `${PROD_BASE}/register/special`;
+const FREELANCER_LOGIN_URL = `${PROD_BASE}/freelancer/login`;
 
-export default function HomePage() {
-  const t = useTranslations('common');
-  const [copiedSpecial, setCopiedSpecial] = useState(false);
+function GatewayCard({ href, emoji, label, url, t }) {
+  const [copied, setCopied] = useState(false);
 
-  const copySpecialLink = async (e) => {
+  const copy = async (e) => {
     e.preventDefault();
     e.stopPropagation();
     try {
-      await navigator.clipboard.writeText(SPECIAL_NEEDS_REGISTER_URL);
-      setCopiedSpecial(true);
-      setTimeout(() => setCopiedSpecial(false), 2000);
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
-      // clipboard API unavailable/denied — no fallback UI needed here,
-      // the tile itself still works as a normal link either way.
+      // clipboard API unavailable/denied — the card itself still works as
+      // a normal link either way, no fallback UI needed here.
     }
   };
 
   return (
-    <div className="page">
+    <Link href={href} className="home-gateway-card">
+      <span className="emoji">{emoji}</span>
+      <span className="label">{label}</span>
+      <button type="button" className="home-copy-btn" onClick={copy}>
+        {copied ? t('homeCopyLinkCopied') : t('homeCopyLinkButton')}
+      </button>
+    </Link>
+  );
+}
+
+export default function HomePage() {
+  const t = useTranslations('common');
+  // Sums two counts /admin already tracks and queries itself (reused
+  // as-is, not reinvented): pending_approval enrollments
+  // (GET /api/admin/pending-registrations) and pending freelancer
+  // session requests (GET /api/admin/freelancer-sessions?status=pending).
+  // Both routes are admin-only; a visitor without an admin session simply
+  // gets 401 here, which is treated the same as "nothing pending" — this
+  // page is public, so it must never leak the actual count to someone
+  // who isn't already authenticated as admin.
+  const [pendingAdminCount, setPendingAdminCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch('/api/admin/pending-registrations', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : { registrations: [] })),
+      fetch('/api/admin/freelancer-sessions?status=pending', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : { sessions: [] })),
+    ])
+      .then(([regData, sessionData]) => {
+        if (cancelled) return;
+        setPendingAdminCount((regData.registrations?.length || 0) + (sessionData.sessions?.length || 0));
+      })
+      .catch(() => {
+        if (!cancelled) setPendingAdminCount(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div className="home-container">
+      <div className="home-bg-bubbles" aria-hidden="true">
+        <span /><span /><span /><span /><span /><span /><span />
+      </div>
+
       <Header sub={t('homeSub')} />
 
-      <div className="nav-grid">
-        <Link href="/staff" className="nav-tile">
-          <span className="emoji">✅</span>
-          <span className="label">{t('navDailyAttendance')}</span>
-        </Link>
-        <Link href="/admin" className="nav-tile">
+      <Link href="/staff" className="home-hero">
+        <span className="emoji">✅</span>
+        <span className="label">{t('navDailyAttendance')}</span>
+      </Link>
+
+      <div className="home-nav-grid">
+        <Link href="/admin" className="nav-tile" style={{ position: 'relative' }}>
           <span className="emoji">⚙️</span>
           <span className="label">{t('navManagement')}</span>
+          {pendingAdminCount > 0 && <span className="home-badge">{pendingAdminCount}</span>}
         </Link>
         <Link href="/history" className="nav-tile">
           <span className="emoji">📅</span>
           <span className="label">{t('navHistory')}</span>
         </Link>
-        <Link href="/register" className="nav-tile">
-          <span className="emoji">📝</span>
-          <span className="label">{t('navRegisterTrainee')}</span>
-        </Link>
-        <div style={{ position: 'relative' }}>
-          <Link href="/register/special" className="nav-tile" style={{ display: 'block' }}>
-            <span className="emoji">🧩</span>
-            <span className="label">{t('navRegisterSpecialNeeds')}</span>
-          </Link>
-          <button
-            type="button"
-            onClick={copySpecialLink}
-            style={{
-              position: 'absolute',
-              top: 6,
-              insetInlineEnd: 6,
-              fontSize: 11,
-              padding: '4px 7px',
-              borderRadius: 6,
-              border: '1px solid var(--border)',
-              background: 'var(--surface-2)',
-              color: 'var(--text)',
-              cursor: 'pointer',
-            }}
-          >
-            {copiedSpecial ? t('copySpecialLinkCopied') : t('copySpecialLinkButton')}
-          </button>
-        </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <label style={{ fontSize: 13, color: 'var(--text-dim)', display: 'block', marginBottom: 8 }}>
-          {t('parentLinkLabel')}
-        </label>
-        <CopyLink path="/register" />
-      </div>
-
-      <div className="card" style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 13, color: 'var(--text-dim)', display: 'block', marginBottom: 8 }}>
-          {t('staffLinkLabel')}
-        </label>
-        <CopyLink path="/staff" />
-      </div>
-
-      <div className="card" style={{ marginTop: 12 }}>
-        <label style={{ fontSize: 13, color: 'var(--text-dim)', display: 'block', marginBottom: 8 }}>
-          {t('freelancerLinkLabel')}
-        </label>
-        <CopyLink path="/freelancer/login" />
+      <div className="home-gateway-grid">
+        <GatewayCard href="/register" emoji="📝" label={t('navRegisterTrainee')} url={REGISTER_URL} t={t} />
+        <GatewayCard href="/register/special" emoji="🧩" label={t('navRegisterSpecialNeeds')} url={SPECIAL_NEEDS_URL} t={t} />
+        <GatewayCard href="/freelancer/login" emoji="🏊" label={t('navFreelancerLogin')} url={FREELANCER_LOGIN_URL} t={t} />
       </div>
     </div>
   );
