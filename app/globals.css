@@ -488,6 +488,65 @@ input, select, textarea {
   }
 }
 
+/* Single flat SVG whale drifting slowly across the home page, same idea
+   as the bubbles above (pure CSS transform, no image/video asset) but on
+   its own long, gently curved pass instead of a short vertical rise.
+   z-index:0 + the fixed positioning matches .home-bg-bubbles exactly —
+   an already-verified pattern in this file for staying behind the
+   opaque cards (z-index:1 via .home-container) without any special
+   per-card handling: the whale is only ever visible in the empty gaps
+   around cards, never drawn on top of one, because it's structurally
+   behind them in the stacking order, not because its path avoids them. */
+.home-bg-whale {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.home-bg-whale svg {
+  position: absolute;
+  /* Physical left, not inset-inline-start: the @keyframes translate
+     values below are physical viewport-width offsets designed to sweep
+     the whale from off-screen-left to off-screen-right. In this app's
+     RTL (Arabic) layout, inset-inline-start resolves to the right edge,
+     which combined with those same offsets pushed the whale almost
+     entirely off-screen for its whole cycle. */
+  left: 0;
+  top: 14%;
+  width: 92px;
+  height: auto;
+  color: var(--accent);
+  opacity: 0.16;
+  fill: currentColor;
+  stroke: currentColor;
+  animation: bwa-whale-swim 42s ease-in-out infinite;
+  will-change: transform;
+}
+
+.home-bg-whale svg path:last-child {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+@keyframes bwa-whale-swim {
+  0%   { transform: translate(-20vw, 0); }
+  20%  { transform: translate(15vw, -6vh); }
+  40%  { transform: translate(42vw, 7vh); }
+  60%  { transform: translate(66vw, -5vh); }
+  80%  { transform: translate(92vw, 6vh); }
+  100% { transform: translate(120vw, -2vh); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-bg-whale svg {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 .summary-bar {
   display: flex;
   justify-content: space-between;

@@ -77,6 +77,17 @@ export default function HomePage() {
         <span /><span /><span /><span /><span /><span /><span />
       </div>
 
+      <div className="home-bg-whale" aria-hidden="true">
+        <svg viewBox="0 0 120 70" xmlns="http://www.w3.org/2000/svg">
+          <path d="M8,42 C6,26 24,12 52,12 C74,12 92,20 103,32 C110,29 116,31 118,36
+                   C116,40 110,41 104,38 C96,52 76,58 50,58 C24,58 9,52 8,42 Z" />
+          <path d="M8,42 C0,34 -1,50 8,44 Z" />
+          <path d="M40,12 C43,3 51,3 52,12 Z" />
+          <circle cx="30" cy="30" r="2.6" />
+          <path d="M50,7 Q52,-1 55,5 M56,4 Q58,-2 60,3" />
+        </svg>
+      </div>
+
       <Header sub={t('homeSub')} />
 
       <Link href="/staff" className="home-hero">
