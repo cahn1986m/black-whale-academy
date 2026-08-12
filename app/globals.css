@@ -515,7 +515,7 @@ input, select, textarea {
      entirely off-screen for its whole cycle. */
   left: 0;
   top: 14%;
-  width: 92px;
+  width: 105px;
   height: auto;
   color: var(--accent);
   opacity: 0.16;
@@ -525,7 +525,8 @@ input, select, textarea {
   will-change: transform;
 }
 
-.home-bg-whale svg path:last-child {
+.home-bg-whale svg .whale-belly,
+.home-bg-whale svg .whale-spout {
   fill: none;
   stroke-width: 1.6;
   stroke-linecap: round;

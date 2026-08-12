@@ -78,13 +78,24 @@ export default function HomePage() {
       </div>
 
       <div className="home-bg-whale" aria-hidden="true">
-        <svg viewBox="0 0 120 70" xmlns="http://www.w3.org/2000/svg">
-          <path d="M8,42 C6,26 24,12 52,12 C74,12 92,20 103,32 C110,29 116,31 118,36
-                   C116,40 110,41 104,38 C96,52 76,58 50,58 C24,58 9,52 8,42 Z" />
-          <path d="M8,42 C0,34 -1,50 8,44 Z" />
-          <path d="M40,12 C43,3 51,3 52,12 Z" />
-          <circle cx="30" cy="30" r="2.6" />
-          <path d="M50,7 Q52,-1 55,5 M56,4 Q58,-2 60,3" />
+        {/* Silhouette echoes the diving whale in public/logo.png (rounded
+            snout, sharp dorsal-fin peak, forked tail, ribbed belly) instead
+            of an invented shape, so it reads as "whale" rather than a
+            generic blob even at this small, low-opacity scale. */}
+        <svg viewBox="0 0 140 70" xmlns="http://www.w3.org/2000/svg">
+          <path
+            className="whale-body"
+            d="M128,32 C124,24 120,19 118,18 Q108,15 95,14 L75,4 Q68,9 60,15
+               C50,18 40,20 35,22 L8,8 L20,30 L4,46 L32,36
+               C40,40 47,44 55,46 Q68,48 80,48 Q95,47 105,44
+               C112,42 118,40 122,38 Z"
+          />
+          <circle className="whale-eye" cx="112" cy="26" r="2.3" />
+          <path
+            className="whale-belly"
+            d="M100,40 Q105,44 112,42 M96,43 Q102,47 110,45 M92,46 Q99,50 107,48"
+          />
+          <path className="whale-spout" d="M120,10 Q122,2 126,8 M124,7 Q126,-1 130,5" />
         </svg>
       </div>
 
