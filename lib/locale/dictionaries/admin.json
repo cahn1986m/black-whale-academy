@@ -273,6 +273,9 @@
     "archivedReasonLine": "سبب الأرشفة: {reason}",
     "archivedSectionTitle": "مؤرشف ({count})",
     "noArchivedTrainees": "ما في متدربين مؤرشفين",
+    "activeSectionTitle": "نشطين ({count})",
+    "searchByNamePlaceholder": "🔍 ابحث بالاسم",
+    "noSearchResults": "ما في نتائج مطابقة",
 
     "scheduleLink": "🗓️ الجدول الأسبوعي",
     "scheduleTitle": "الجدول الأسبوعي",
@@ -573,6 +576,9 @@
     "archivedReasonLine": "Archive reason: {reason}",
     "archivedSectionTitle": "Archived ({count})",
     "noArchivedTrainees": "No archived trainees",
+    "activeSectionTitle": "Active ({count})",
+    "searchByNamePlaceholder": "🔍 Search by name",
+    "noSearchResults": "No matching results",
 
     "scheduleLink": "🗓️ Weekly schedule",
     "scheduleTitle": "Weekly schedule",

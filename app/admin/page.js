@@ -119,7 +119,9 @@ export default function AdminPage() {
   const [activities, setActivities] = useState([]);
   const [children, setChildren] = useState([]);
   const [archivedChildren, setArchivedChildren] = useState([]);
+  const [activeSectionOpen, setActiveSectionOpen] = useState(false);
   const [archivedSectionOpen, setArchivedSectionOpen] = useState(false);
+  const [childSearchQuery, setChildSearchQuery] = useState('');
   const [instructors, setInstructors] = useState([]);
   const [activityForm, setActivityForm] = useState({ name: '', emoji: '', instructorName: '', scheduleText: '' });
   const [packageDraft, setPackageDraft] = useState({}); // { [activityId]: { sessionCount, price } }
@@ -884,6 +886,32 @@ export default function AdminPage() {
       byChild.get(r.child_id).activities.push(r);
     }
   }
+
+  // Live client-side name filter — both lists are already fully loaded
+  // (see load()), so no round-trip is needed; no other search/filter-by-
+  // name UI exists anywhere else in the app to reuse (checked first).
+  const normalizedSearch = childSearchQuery.trim().toLowerCase();
+  const filteredChildren = normalizedSearch
+    ? children.filter((c) => c.full_name.toLowerCase().includes(normalizedSearch))
+    : children;
+  const filteredArchivedChildren = normalizedSearch
+    ? archivedChildren.filter((c) => c.full_name.toLowerCase().includes(normalizedSearch))
+    : archivedChildren;
+
+  // Typing a query auto-opens whichever section(s) actually contain a
+  // match, so the user never has to manually expand a section first to
+  // see search results land inside it. Clearing the search deliberately
+  // leaves sections as the user last set them (no surprise re-collapse).
+  useEffect(() => {
+    if (!normalizedSearch) return;
+    if (children.some((c) => c.full_name.toLowerCase().includes(normalizedSearch))) {
+      setActiveSectionOpen(true);
+    }
+    if (archivedChildren.some((c) => c.full_name.toLowerCase().includes(normalizedSearch))) {
+      setArchivedSectionOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedSearch]);
 
   const renderChildRow = (c) => (
         <div key={c.id}>
@@ -1661,11 +1689,35 @@ export default function AdminPage() {
         {resetting ? t('deletingData') : t('deleteAllData')}
       </button>
 
-      <div style={{ fontWeight: 'bold', margin: '22px 0 10px' }}>
-        {t('traineesRegisteredCount', { count: children.length })}
+      <input
+        type="text"
+        value={childSearchQuery}
+        onChange={(e) => setChildSearchQuery(e.target.value)}
+        placeholder={t('searchByNamePlaceholder')}
+        style={{
+          width: '100%',
+          marginTop: 22,
+          padding: '10px 12px',
+          borderRadius: 8,
+          background: 'var(--surface-2)',
+          color: 'var(--text)',
+          border: '1px solid var(--border)',
+          fontSize: 14,
+        }}
+      />
+
+      <div
+        style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: '18px 0 10px' }}
+        onClick={() => setActiveSectionOpen((v) => !v)}
+      >
+        <span style={{ fontWeight: 'bold' }}>{t('activeSectionTitle', { count: children.length })}</span>
+        <span style={{ transition: 'transform 0.15s', transform: activeSectionOpen ? 'rotate(90deg)' : 'rotate(0deg)', display: 'inline-block' }}>▶</span>
       </div>
-      {children.length === 0 && <div className="empty">{t('noTraineesYet')}</div>}
-      {children.map(renderChildRow)}
+      {activeSectionOpen && (
+        filteredChildren.length === 0
+          ? <div className="empty">{normalizedSearch ? t('noSearchResults') : t('noTraineesYet')}</div>
+          : filteredChildren.map(renderChildRow)
+      )}
 
       <div
         style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', margin: '22px 0 10px' }}
@@ -1675,9 +1727,9 @@ export default function AdminPage() {
         <span style={{ transition: 'transform 0.15s', transform: archivedSectionOpen ? 'rotate(90deg)' : 'rotate(0deg)', display: 'inline-block' }}>▶</span>
       </div>
       {archivedSectionOpen && (
-        archivedChildren.length === 0
-          ? <div className="empty">{t('noArchivedTrainees')}</div>
-          : archivedChildren.map(renderChildRow)
+        filteredArchivedChildren.length === 0
+          ? <div className="empty">{normalizedSearch ? t('noSearchResults') : t('noArchivedTrainees')}</div>
+          : filteredArchivedChildren.map(renderChildRow)
       )}
 
       <a href="/admin/freelancers" className="btn" style={{ display: 'flex', marginTop: 22 }}>
