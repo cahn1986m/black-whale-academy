@@ -15,6 +15,9 @@ export async function POST(request, { params }) {
     const body = await request.json().catch(() => ({}));
     const dayOfWeek = body.dayOfWeek;
     const startTime = typeof body.startTime === 'string' ? body.startTime.trim() : '';
+    // Optional override — NULL (the default when omitted) falls back to
+    // the activity's own instructor_id, see slot-instructor-override-schema.sql.
+    const instructorId = body.instructorId ? Number(body.instructorId) : null;
 
     if (!DAYS_OF_WEEK.includes(dayOfWeek)) {
       return NextResponse.json({ error: 'يوم الأسبوع غير صحيح' }, { status: 400 });
@@ -30,13 +33,20 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'النشاط غير موجود' }, { status: 404 });
     }
 
+    if (instructorId) {
+      const [instructor] = await sql`SELECT id FROM instructors WHERE id = ${instructorId}`;
+      if (!instructor) {
+        return NextResponse.json({ error: 'المدرب غير موجود' }, { status: 404 });
+      }
+    }
+
     const endTime = addOneHour(startTime);
 
     try {
       const [slot] = await sql`
-        INSERT INTO activity_time_slots (activity_id, day_of_week, start_time, end_time)
-        VALUES (${activityId}, ${dayOfWeek}, ${startTime}, ${endTime})
-        RETURNING id, activity_id, day_of_week, start_time, end_time
+        INSERT INTO activity_time_slots (activity_id, day_of_week, start_time, end_time, instructor_id)
+        VALUES (${activityId}, ${dayOfWeek}, ${startTime}, ${endTime}, ${instructorId})
+        RETURNING id, activity_id, day_of_week, start_time, end_time, instructor_id
       `;
       return NextResponse.json({ slot });
     } catch (err) {

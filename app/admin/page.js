@@ -396,32 +396,52 @@ export default function AdminPage() {
     load();
   };
 
+  const emptySlotDraft = { dayOfWeeks: [], startTime: '', instructorId: '' };
+
   const updateSlotDraft = (activityId, field, value) => {
     setSlotDraft((prev) => {
-      const current = prev[activityId] || { dayOfWeek: '', startTime: '' };
+      const current = prev[activityId] || emptySlotDraft;
       const next = { ...current, [field]: value };
-      if (field === 'dayOfWeek') next.startTime = '';
+      if (field === 'dayOfWeeks') next.startTime = ''; // available hours depend on which days are picked
       return { ...prev, [activityId]: next };
     });
   };
 
+  const toggleSlotDraftDay = (activityId, day) => {
+    setSlotDraft((prev) => {
+      const current = prev[activityId] || emptySlotDraft;
+      const days = current.dayOfWeeks.includes(day)
+        ? current.dayOfWeeks.filter((d) => d !== day)
+        : [...current.dayOfWeeks, day];
+      return { ...prev, [activityId]: { ...current, dayOfWeeks: days, startTime: '' } };
+    });
+  };
+
+  // One start time applies to every checked day (Sunday+Tuesday+Thursday
+  // at 4pm is the real-world case this exists for) — creates one slot per
+  // selected day in a single submit, instead of the old flow that made
+  // staff repeat "pick day, pick time, click add" once per day.
   const addSlot = async (activityId) => {
-    const draft = slotDraft[activityId] || {};
-    if (!draft.dayOfWeek || !draft.startTime) {
+    const draft = slotDraft[activityId] || emptySlotDraft;
+    if (draft.dayOfWeeks.length === 0 || !draft.startTime) {
       alert(t('selectDayAndTime'));
       return;
     }
-    const res = await fetch(`/api/activities/${activityId}/slots`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dayOfWeek: draft.dayOfWeek, startTime: draft.startTime }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      alert(`${t('genericErrorPrefix')}: ${data.error}`);
-      return;
+    const instructorId = draft.instructorId ? Number(draft.instructorId) : null;
+    const results = await Promise.all(
+      draft.dayOfWeeks.map((dayOfWeek) =>
+        fetch(`/api/activities/${activityId}/slots`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dayOfWeek, startTime: draft.startTime, instructorId }),
+        }).then(async (res) => ({ ok: res.ok, dayOfWeek, error: res.ok ? null : (await res.json()).error }))
+      )
+    );
+    const failed = results.filter((r) => !r.ok);
+    if (failed.length > 0) {
+      alert(failed.map((f) => `${t(DAY_LABEL_KEYS[f.dayOfWeek])}: ${f.error}`).join('\n'));
     }
-    setSlotDraft((prev) => ({ ...prev, [activityId]: { dayOfWeek: '', startTime: '' } }));
+    setSlotDraft((prev) => ({ ...prev, [activityId]: emptySlotDraft }));
     load();
   };
 
@@ -435,6 +455,20 @@ export default function AdminPage() {
     }
     load();
     if (expandedChildId) loadEnrollments(expandedChildId);
+  };
+
+  const updateSlotInstructor = async (slotId, instructorId) => {
+    const res = await fetch(`/api/slots/${slotId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instructorId }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      alert(`${t('genericErrorPrefix')}: ${data.error}`);
+      return;
+    }
+    load();
   };
 
   const loadEnrollmentSlots = async (enrollmentId) => {
@@ -1627,47 +1661,79 @@ export default function AdminPage() {
           </div>
 
           <div style={{ fontSize: 13, fontWeight: 'bold', marginTop: 16, marginBottom: 6 }}>{t('timeSlotsTitle')}</div>
-          <div className="tabs" style={{ flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
             {DAYS_OF_WEEK.flatMap((day) =>
               (a.slots || [])
                 .filter((s) => s.day_of_week === day)
                 .map((s) => (
-                  <span className="tab" key={s.id}>
-                    {t(DAY_LABEL_KEYS[s.day_of_week])} {formatTimeShort(s.start_time)}–{formatTimeShort(s.end_time)}{' '}
-                    <button
-                      type="button"
-                      onClick={() => deleteSlot(s)}
-                      style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, marginInlineStart: 4 }}
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span className="tab">
+                      {t(DAY_LABEL_KEYS[s.day_of_week])} {formatTimeShort(s.start_time)}–{formatTimeShort(s.end_time)}{' '}
+                      <button
+                        type="button"
+                        onClick={() => deleteSlot(s)}
+                        style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', padding: 0, marginInlineStart: 4 }}
+                      >
+                        ×
+                      </button>
+                    </span>
+                    <select
+                      value={s.instructor_id || ''}
+                      onChange={(e) => updateSlotInstructor(s.id, e.target.value ? Number(e.target.value) : null)}
+                      style={{ fontSize: 12, padding: '4px 8px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
                     >
-                      ×
-                    </button>
-                  </span>
+                      <option value="">{t('sameAsActivityInstructor')}</option>
+                      {instructors.filter((i) => i.active).map((i) => (
+                        <option key={i.id} value={i.id}>{i.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 ))
             )}
             {(!a.slots || a.slots.length === 0) && <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('noSlotsYet')}</span>}
           </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <select
-              value={slotDraft[a.id]?.dayOfWeek || ''}
-              onChange={(e) => updateSlotDraft(a.id, 'dayOfWeek', e.target.value)}
-              style={{ flex: 1, minWidth: 0 }}
-            >
-              <option value="">{t('selectDay')}</option>
-              {DAYS_OF_WEEK.map((day) => (
-                <option key={day} value={day}>{t(DAY_LABEL_KEYS[day])}</option>
-              ))}
-            </select>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
+            {DAYS_OF_WEEK.map((day) => (
+              <label key={day} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13 }}>
+                <input
+                  type="checkbox"
+                  checked={(slotDraft[a.id]?.dayOfWeeks || []).includes(day)}
+                  onChange={() => toggleSlotDraftDay(a.id, day)}
+                />
+                {t(DAY_LABEL_KEYS[day])}
+              </label>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
             <select
               value={slotDraft[a.id]?.startTime || ''}
               onChange={(e) => updateSlotDraft(a.id, 'startTime', e.target.value)}
-              disabled={!slotDraft[a.id]?.dayOfWeek}
+              disabled={(slotDraft[a.id]?.dayOfWeeks || []).length === 0}
               style={{ flex: 1, minWidth: 0 }}
             >
               <option value="">{t('selectStartTime')}</option>
-              {(ALLOWED_START_HOURS[slotDraft[a.id]?.dayOfWeek] || []).map((hour) => {
-                const hh = String(hour).padStart(2, '0');
-                return <option key={hour} value={`${hh}:00`}>{hh}:00</option>;
-              })}
+              {/* Intersection of allowed hours across every checked day — if Sunday
+                  (10am-9pm) and a weekday (4pm-9pm) are both checked, only hours
+                  valid for BOTH show up, since one submit creates the same time
+                  on every checked day. */}
+              {(slotDraft[a.id]?.dayOfWeeks || [])
+                .map((day) => ALLOWED_START_HOURS[day] || [])
+                .reduce((acc, hours) => acc.filter((h) => hours.includes(h)), Object.values(ALLOWED_START_HOURS)[0] || [])
+                .sort((x, y) => x - y)
+                .map((hour) => {
+                  const hh = String(hour).padStart(2, '0');
+                  return <option key={hour} value={`${hh}:00`}>{hh}:00</option>;
+                })}
+            </select>
+            <select
+              value={slotDraft[a.id]?.instructorId || ''}
+              onChange={(e) => updateSlotDraft(a.id, 'instructorId', e.target.value)}
+              style={{ flex: 1, minWidth: 0 }}
+            >
+              <option value="">{t('sameAsActivityInstructor')}</option>
+              {instructors.filter((i) => i.active).map((i) => (
+                <option key={i.id} value={i.id}>{i.name}</option>
+              ))}
             </select>
             <button className="btn secondary" type="button" onClick={() => addSlot(a.id)} style={{ width: 'auto', padding: '8px 14px', fontSize: 13, flexShrink: 0 }}>
               {t('addSlotButton')}

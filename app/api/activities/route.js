@@ -25,7 +25,7 @@ export async function GET() {
       ORDER BY activity_id ASC, session_count ASC
     `;
     const slots = await sql`
-      SELECT id, activity_id, day_of_week, start_time, end_time
+      SELECT id, activity_id, day_of_week, start_time, end_time, instructor_id
       FROM activity_time_slots
       ORDER BY activity_id ASC, day_of_week ASC, start_time ASC
     `;

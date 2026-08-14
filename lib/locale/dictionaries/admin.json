@@ -300,7 +300,12 @@
     "timeSlotsButton": "الخانات الزمنية",
     "assignedSlotsNote": "الخانات الزمنية يلي المتدرب مسجل فيها بهالنشاط",
     "sessionsPerWeekOverrideNote": "عدد الحصص الأسبوعية الفعلي (يُستخدم بحساب تاريخ الانتهاء) — تلقائياً من عدد الخانات المعيّنة أو الباقة، أو حدد رقم يدوي",
-    "autoLabel": "تلقائي"
+    "autoLabel": "تلقائي",
+
+    "sameAsActivityInstructor": "نفس مدرب النشاط",
+    "instructorScheduleTitle": "جدول المدرب",
+    "noScheduleForInstructor": "ما في خانات زمنية لهالمدرب حالياً",
+    "studentsCountLabel": "{count} متدرب"
   },
   "en": {
     "loginSub": "Admin login",
@@ -603,6 +608,11 @@
     "timeSlotsButton": "Time slots",
     "assignedSlotsNote": "The time slots this trainee is assigned to for this activity",
     "sessionsPerWeekOverrideNote": "Actual sessions/week (used for the expiry date) — automatic from assigned slots or the package, or set a manual number",
-    "autoLabel": "Auto"
+    "autoLabel": "Auto",
+
+    "sameAsActivityInstructor": "Same as activity's instructor",
+    "instructorScheduleTitle": "Instructor schedule",
+    "noScheduleForInstructor": "No time slots for this instructor yet",
+    "studentsCountLabel": "{count} students"
   }
 }

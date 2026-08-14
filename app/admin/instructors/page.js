@@ -4,6 +4,15 @@ import { useEffect, useState } from 'react';
 import Header from '../../Header';
 import { useLocale, useTranslations } from '@/lib/locale/LocaleContext';
 
+const DAY_LABEL_KEYS = {
+  sunday: 'daySunday', monday: 'dayMonday', tuesday: 'dayTuesday', wednesday: 'dayWednesday',
+  thursday: 'dayThursday', friday: 'dayFriday', saturday: 'daySaturday',
+};
+
+function formatTimeShort(t) {
+  return t ? t.slice(0, 5) : t;
+}
+
 export default function AdminInstructorsPage() {
   const { locale } = useLocale();
   const t = useTranslations('admin');
@@ -34,6 +43,7 @@ export default function AdminInstructorsPage() {
   const [instructorFormError, setInstructorFormError] = useState('');
 
   const [expandedInstructorId, setExpandedInstructorId] = useState(null);
+  const [expandedSlotId, setExpandedSlotId] = useState(null);
   const [instructorDetail, setInstructorDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [instructorLedger, setInstructorLedger] = useState(null);
@@ -176,7 +186,7 @@ export default function AdminInstructorsPage() {
       const res = await fetch(`/api/admin/instructors/${instructorId}`, { cache: 'no-store' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || tc('error'));
-      setInstructorDetail({ instructor: data.instructor, linkedActivities: data.linkedActivities });
+      setInstructorDetail({ instructor: data.instructor, linkedActivities: data.linkedActivities, schedule: data.schedule || [] });
       setEditForm({
         name: data.instructor.name,
         contact: data.instructor.contact || '',
@@ -201,6 +211,7 @@ export default function AdminInstructorsPage() {
       return;
     }
     setExpandedInstructorId(instructorId);
+    setExpandedSlotId(null);
     setInstructorDetail(null);
     setInstructorLedger(null);
     setShowPaymentForm(false);
@@ -602,6 +613,33 @@ export default function AdminInstructorsPage() {
                       instructorDetail.linkedActivities.map((a) => (
                         <div key={a.id} style={{ fontSize: 13, padding: '6px 0' }}>
                           {a.name}
+                        </div>
+                      ))
+                    )}
+
+                    <div style={{ fontWeight: 'bold', margin: '18px 0 8px' }}>{t('instructorScheduleTitle')}</div>
+                    {instructorDetail.schedule.length === 0 ? (
+                      <div className="empty">{t('noScheduleForInstructor')}</div>
+                    ) : (
+                      instructorDetail.schedule.map((s) => (
+                        <div key={s.id} style={{ marginBottom: 4 }}>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedSlotId(expandedSlotId === s.id ? null : s.id)}
+                            className="status-pill present"
+                            style={{ width: '100%', textAlign: 'start', fontSize: 12, cursor: 'pointer' }}
+                          >
+                            {s.emoji ? `${s.emoji} ` : ''}{s.activity_name} — {t(DAY_LABEL_KEYS[s.day_of_week])} {formatTimeShort(s.start_time)}–{formatTimeShort(s.end_time)} ({t('studentsCountLabel', { count: s.children.length })})
+                          </button>
+                          {expandedSlotId === s.id && (
+                            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4, paddingInlineStart: 4 }}>
+                              {s.children.length === 0 ? (
+                                <div>{t('noChildrenAssigned')}</div>
+                              ) : (
+                                s.children.map((c) => <div key={c.id}>{c.full_name}</div>)
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))
                     )}

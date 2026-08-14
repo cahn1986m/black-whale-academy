@@ -23,7 +23,49 @@ export async function GET(request, { params }) {
     SELECT id, name FROM activities WHERE instructor_id = ${instructorId}
   `;
 
-  return NextResponse.json({ instructor, linkedActivities });
+  // This instructor's effective weekly schedule: slots they're assigned to
+  // directly (activity_time_slots.instructor_id), plus slots on activities
+  // where they're the default instructor and the slot itself has no
+  // override (COALESCE mirrors the same "direct wins, else activity
+  // default" rule used everywhere else instructor_id is resolved). Same
+  // shape/grouping as GET /api/admin/schedule, just pre-filtered to this
+  // instructor instead of every slot.
+  const scheduleRows = await sql`
+    SELECT
+      ts.id AS slot_id, ts.activity_id, a.name AS activity_name, a.emoji,
+      ts.day_of_week, ts.start_time, ts.end_time,
+      c.id AS child_id, c.full_name
+    FROM activity_time_slots ts
+    JOIN activities a ON a.id = ts.activity_id
+    LEFT JOIN enrollment_slot_assignments esa ON esa.slot_id = ts.id
+    LEFT JOIN enrollments e ON e.id = esa.enrollment_id AND e.status = 'active'
+    LEFT JOIN children c ON c.id = e.child_id
+    WHERE COALESCE(ts.instructor_id, a.instructor_id) = ${instructorId}
+    ORDER BY ts.day_of_week ASC, ts.start_time ASC, c.full_name ASC
+  `;
+
+  const scheduleBySlot = new Map();
+  for (const row of scheduleRows) {
+    let slot = scheduleBySlot.get(row.slot_id);
+    if (!slot) {
+      slot = {
+        id: row.slot_id,
+        activity_id: row.activity_id,
+        activity_name: row.activity_name,
+        emoji: row.emoji,
+        day_of_week: row.day_of_week,
+        start_time: row.start_time,
+        end_time: row.end_time,
+        children: [],
+      };
+      scheduleBySlot.set(row.slot_id, slot);
+    }
+    if (row.child_id) {
+      slot.children.push({ id: row.child_id, full_name: row.full_name });
+    }
+  }
+
+  return NextResponse.json({ instructor, linkedActivities, schedule: Array.from(scheduleBySlot.values()) });
 }
 
 export async function PATCH(request, { params }) {
